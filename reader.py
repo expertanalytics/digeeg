@@ -11,6 +11,7 @@ import numpy as np
 
 import shapely.geometry
 
+
 class colors(enum.Enum):
 
     BLUE = (255, 0, 0)
@@ -21,7 +22,7 @@ class colors(enum.Enum):
     def bgr(self):
         return self.value
 
-    def dist(self, other):
+    def dist(self, other) -> float:
         return np.linalg.norm(np.array(self.value) - other)
 
 
@@ -100,10 +101,10 @@ class Line:
 class Reader:
     color_to_grayscale: int = cv2.COLOR_BGR2GRAY
 
-    blur_kernel_size: tp.Tuple[int, int] = (3,3)
+    blur_kernel_size: tp.Tuple[int, int] = (3, 3)
     blur_dist: int = 0
 
-    morph_kernel = np.ones((3,3))
+    morph_kernel = np.ones((3, 3))
     morph_num_iter = 1
 
     thresh_val = 130
@@ -119,6 +120,8 @@ class Reader:
     marker_min_aspect = 0.5
     marker_min_area = 100
     marker_max_value = 100
+
+    rectangle_approx_tol = 0.04
 
     def get_image_moment(self, order: int = 1):
         image = self.image
@@ -155,7 +158,7 @@ class Reader:
         (c, d, a, b) = svd[-1][-1, :]
 
         # Equation for x-axis -- best fit for centreline
-        x_axis = Line(a, b, (c+d)/2)
+        x_axis = Line(a, b, (c + d)/2)
 
         # Get image gentroid and orient the line
         image_centre = self.get_image_moment(order=1)
@@ -175,7 +178,12 @@ class Reader:
 
     def match_contours(self,
                        match_types: tp.List[str],
-                       contours=None):
+                       contours: tp.List[np.ndarray] = None):
+        """Iterate over the contours and apply a classifying function to each contour.
+
+        Return a dictionary of the matches with the match type as key. There can only
+        be one matchtype per contour.
+        """
         contours = contours or self.get_contours()
 
         matchers = {type: getattr(self, f"match_{type}") for type in match_types}
@@ -190,18 +198,22 @@ class Reader:
 
         return matches
 
-    def match_rectangle(self, c):
+    def match_rectangle(self, c: np.ndarray):
+        """If `c` can be approximated by a square, return an approximation."""
         perimeter = cv2.arcLength(c, True)
-        approx = cv2.approxPolyDP(c, 0.04 * perimeter, True)
+
+        # create a closed polygonal approximation to `c` with the distance between them
+        # less than `epsilon*perimeter`.
+        approx = cv2.approxPolyDP(c, self.rectangle_approx_tol*perimeter, True)
 
         if len(approx) == 4:
-
             angles = angles_in_contour(approx)
             # Check angles for rectangle
             if max(abs(angles - np.pi/2)) < 0.1  * np.pi:
                 return approx
 
-    def match_marker(self, c):
+    def match_marker(self, c: np.ndarray) -> np.ndarray:
+        """Return rectange if it matches a square marker on the paper strip."""
         rectangle = self.match_rectangle(c)
 
         if (rectangle is not None
@@ -210,7 +222,8 @@ class Reader:
                 and self.get_contour_mean_value(rectangle) < self.marker_max_value):
             return rectangle
 
-    def match_graph_candidate(self, c):
+    def match_graph_candidate(self, c: np.ndarray) -> np.ndarray:
+        """Return contour if it is poorly approximated by a circle."""
         perimeter = cv2.arcLength(c, True)
         pg = shapely.geometry.Polygon(c.reshape(-1, 2))
         rel_area = 4 * pg.area / perimeter**2
@@ -245,19 +258,25 @@ class Reader:
         max_value = self.image_orig[J, I].max()
         return max_value
 
-    def load_image(self, filepath: pathlib.Path):
+    def load_image(self, filepath: pathlib.Path) -> None:
         self.filepath = filepath
         self.image_orig = cv2.imread(str(filepath))
-        self.reset_image()
+        self.reset_image()      # Copy image
         self.axis = None
 
-    def reset_image(self):
+    def reset_image(self) -> None:
         self.image = self.image_orig.copy()
 
-    def bgr_to_gray(self):
+    def bgr_to_gray(self) -> None:
+        """Convert image to greyscale."""
         self.image = cv2.cvtColor(self.image, self.color_to_grayscale)
 
-    def threshold(self, thresh_val=None):
+    def threshold(self, thresh_val: float = None) -> None:
+        """Apply a fixed level threshold to each pixel. 
+
+        dst(x, y) = maxval if src(x, y) > thresh_val else 0
+
+        """
         thresh_val = thresh_val or self.thresh_val
         self.image = cv2.threshold(self.image, self.thresh_val,
                                    self.thresh_maxval, cv2.THRESH_BINARY)[1]
@@ -272,10 +291,12 @@ class Reader:
         self.image = cv2.morphologyEx(self.image, cv2.MORPH_ERODE,
                                       kernel=kernel, iterations=iterations)
 
-    def invert(self):
+    def invert(self) -> None:
+        """Invert a binary greyscale image."""
         self.image = self.thresh_maxval - self.image
 
-    def get_contours(self, min_size: int = 6):
+    def get_contours(self, min_size: int = 6) -> tp.List[np.ndarray]:
+        """Find contours in a binary image."""
         contours = cv2.findContours(self.image, self.contour_mode, self.contour_method)
         contours = imutils.grab_contours(contours)
         contours = list(filter(lambda c: c.size > min_size, contours))
@@ -333,7 +354,6 @@ class Reader:
         features.update(self.match_contours(match_types=["graph_candidate"]))
 
         self.draw(features)
-
         return features
 
 
@@ -342,7 +362,7 @@ def indices_in_window(x0, y0, x1, y1):
     return np.hstack((I.reshape(-1, 1), J.reshape(-1,1)))
 
 
-def angles_in_contour(c):
+def angles_in_contour(c: np.ndarray) -> np.ndarray:
     """Get angles of a convex contour. """
     pg = c.reshape(-1, 2)
     # Get normalized edge vectors
@@ -364,9 +384,9 @@ def rectangle_aspect(c):
     dy = np.linalg.norm(pg[3] - pg[0])
     return min(dx, dy) / max(dx, dy)
 
+
 if __name__ == "__main__":
     reader = Reader()
 
     filepath = pathlib.Path("data/scan1.png")
     conts = reader.read_image(filepath)
-
