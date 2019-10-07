@@ -11,6 +11,8 @@ import numpy as np
 
 import shapely.geometry
 
+import matplotlib.pyplot as plt
+
 
 class colors(enum.Enum):
 
@@ -272,14 +274,14 @@ class Reader:
         self.image = cv2.cvtColor(self.image, self.color_to_grayscale)
 
     def threshold(self, thresh_val: float = None) -> None:
-        """Apply a fixed level threshold to each pixel. 
+        """Apply a fixed level threshold to each pixel.
 
         dst(x, y) = maxval if src(x, y) > thresh_val else 0
 
+        thresh_val is set from the image histogram using Otsu's binarisation, assuming the image
+        histogram is bimodal.
         """
-        thresh_val = thresh_val or self.thresh_val
-        self.image = cv2.threshold(self.image, self.thresh_val,
-                                   self.thresh_maxval, cv2.THRESH_BINARY)[1]
+        _, self.image = cv2.threshold(self.image, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
 
     def blur(self, kernel_size=None):
         kernel_size = kernel_size or self.blur_kernel_size
@@ -329,6 +331,12 @@ class Reader:
         cv2.imshow("Image", image_draw)
         cv2.waitKey(0)
 
+    def plot(self):
+        fig, ax = plt.subplots(1)
+        ax.imshow(self.image, "gray")
+        plt.show()
+        plt.close(fig)
+
     def read_image(self, filepath: pathlib.Path):
         self.load_image(filepath)
 
@@ -337,6 +345,8 @@ class Reader:
         self.bgr_to_gray()
         self.threshold()
         self.invert()
+        self.plot()
+        assert False
 
         features = self.match_contours(match_types=["marker"])
 
