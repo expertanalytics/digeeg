@@ -280,6 +280,8 @@ class Reader:
 
         thresh_val is set from the image histogram using Otsu's binarisation, assuming the image
         histogram is bimodal.
+
+        It is recommended to blur the image before binarisation.
         """
         _, self.image = cv2.threshold(self.image, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
 
@@ -287,11 +289,32 @@ class Reader:
         kernel_size = kernel_size or self.blur_kernel_size
         self.image = cv2.blur(self.image, self.blur_kernel_size, self.blur_dist)
 
-    def morph(self, kernel=None, iterations=None):
-        kernel = kernel or self.morph_kernel
+    def morph(self, transform, kernel=None, iterations=None):
+        """
+        Valid transforms include:
+         - cv2.MORPH_ERODE
+         - cv2.MORPH_OPEN
+         - cv2.MORPH_CLOSE
+         - cv2.MORPH_DILATE
+
+        """
+        if kernel is None:
+            kernel = self.morph_kernel
         iterations = iterations or self.morph_num_iter
-        self.image = cv2.morphologyEx(self.image, cv2.MORPH_ERODE,
-                                      kernel=kernel, iterations=iterations)
+        self.image = cv2.morphologyEx(
+            self.image,
+            transform,
+            kernel=kernel,
+            iterations=iterations
+        )
+
+    def close(self, kernel=None, iterations=None):
+        if kernel is None:
+            kernel = self.morph_kernel
+
+        if iterations is None:
+            iterations = self.morph_num_iter
+
 
     def invert(self) -> None:
         """Invert a binary greyscale image."""
@@ -343,10 +366,12 @@ class Reader:
         # Try to find the black markers in a fairly sharp image
         # First convert to binary grayscale image and convert
         self.bgr_to_gray()
-        self.threshold()
         self.invert()
+        # self.blur(3)
+        self.threshold()
+
+        self.morph(cv2.MORPH_CLOSE)
         self.plot()
-        assert False
 
         features = self.match_contours(match_types=["marker"])
 
@@ -357,9 +382,9 @@ class Reader:
         # Reset and find graphs
         self.reset_image()
         self.bgr_to_gray()
-        self.threshold()
-        self.morph()
         self.invert()
+        # self.blur(3)
+        self.threshold()
 
         features.update(self.match_contours(match_types=["graph_candidate"]))
 
@@ -398,5 +423,5 @@ def rectangle_aspect(c):
 if __name__ == "__main__":
     reader = Reader()
 
-    filepath = pathlib.Path("data/scan1.png")
+    filepath = pathlib.Path("data/scan3.png")
     conts = reader.read_image(filepath)
