@@ -354,9 +354,14 @@ class Reader:
         cv2.imshow("Image", image_draw)
         cv2.waitKey(0)
 
-    def plot(self):
+    def plot(self, image=None):
         fig, ax = plt.subplots(1)
-        ax.imshow(self.image, "gray")
+        if image is None:
+            _image = self.image
+        else:
+            _image = image
+
+        ax.imshow(_image, "gray")
         plt.show()
         plt.close(fig)
 
@@ -367,8 +372,40 @@ class Reader:
         # First convert to binary grayscale image and convert
         self.bgr_to_gray()
         self.invert()
-        # self.blur(3)
+        self.blur(3)
+
+
+        # self.image = cv2.equalizeHist(self.image)       # Works wonders for low quality?
+
+
         self.threshold()
+
+
+        horizontal = self.image.copy()
+
+        structuring_element = cv2.getStructuringElement(cv2.MORPH_RECT, (4, 4))
+        horizontal = cv2.erode(horizontal, structuring_element)
+        horizontal = cv2.dilate(horizontal, structuring_element)
+
+        # 1. Extract edges
+        edges = cv2.adaptiveThreshold(horizontal, 255, cv2.ADAPTIVE_THRESH_MEAN_C, cv2.THRESH_BINARY, 3, -2)
+
+        # 2. Dilate edges
+        kernel = np.ones((2, 2))
+        edges = cv2.dilate(edges, kernel)
+
+        # 3. src.copyTo(smooth)
+        smooth = horizontal.copy()
+
+        # 4. blur smooth img
+        smooth = cv2.blur(smooth, (2, 2))
+
+        # 5 smooth.copyTo(src, edges)
+        horizontal = cv2.copyTo(smooth, edges)
+
+        # from IPython import embed; embed()
+        self.plot(smooth)
+        self.image = smooth.copy()
 
         self.morph(cv2.MORPH_CLOSE)
         self.plot()
@@ -423,5 +460,5 @@ def rectangle_aspect(c):
 if __name__ == "__main__":
     reader = Reader()
 
-    filepath = pathlib.Path("data/scan3.png")
+    filepath = pathlib.Path("data/scan3_sample2.png")
     conts = reader.read_image(filepath)
