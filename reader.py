@@ -43,7 +43,7 @@ class Line:
         # Normalize -- Two lines are the same if parameters are the same up to
         # a _positive_ scaling factor, left side is positive
 
-        norm = np.linalg.norm(dataclasses.astuple(self))
+        norm = np.linalg.norm(dataclasses.astuple(self)[:2])
         self.a = self.a / norm
         self.b = self.b / norm
         self.c = self.c / norm
@@ -54,6 +54,15 @@ class Line:
 
     def __neg__(self) -> "Line":
         return self.__class__(-self.a, -self.b, -self.c)
+
+    def parallel_line(self, point) -> "Line":
+        """Returns the parallel line passing through (x, y). """
+
+        x, y = point
+        a, b, c = dataclasses.astuple(self)
+
+        # Orientation consistent with cross-product with pos. z-axis
+        return self.__class__(a, b, -a * x - b * y)
 
     def orthogonal_line(self, point) -> "Line":
         """Returns the orthogonal line passing through (x, y). """
@@ -77,6 +86,14 @@ class Line:
         x0, y0 = (0, int(-c/b))
         x1, y1 = (n, int(-(a*n + c)/b))
         return ((x0, y0), (x1, y1))
+
+    def __add__(self, other):
+        a, b, c = dataclasses.astuple(self)
+        return self.__class__(a, b, c + float(other))
+
+    def __sub__(self, other):
+        a, b, c = dataclasses.astuple(self)
+        return self.__class__(a, b, c - float(other))
 
     def __ge__(self, point):
         return self(point) <= 0
@@ -102,6 +119,7 @@ class Line:
 @dataclasses.dataclass
 class Reader:
     color_to_grayscale: int = cv2.COLOR_BGR2GRAY
+    grayscale_to_color: int = cv2.COLOR_GRAY2BGR
 
     blur_kernel_size: tp.Tuple[int, int] = (3, 3)
     blur_dist: int = 0
@@ -125,8 +143,16 @@ class Reader:
 
     rectangle_approx_tol = 0.04
 
+    resample_x_max = 1.8
+    resample_y_max = 0.8
+    resample_step_x = 1/1000
+    resample_step_y = 1/1000
+
     def get_image_moment(self, order: int = 1):
         image = self.image
+        if len(image.shape) > 2:
+            image = np.mean(image, axis=2)
+
         m, n = image.shape
         v = np.mean(image)
         x0 = np.mean(image * np.arange(n)**order) / v
@@ -160,7 +186,8 @@ class Reader:
         c, d, a, b = svd[-1][-1, :]
 
         # Equation for x-axis -- best fit for centreline
-        x_axis = Line(a, b, (c + d)/2)
+        # x_axis = Line(a, b, (c + d)/2)
+        x_axis = Line(a, b, c)      # Why not (c + d) / 2
 
         # Get image gentroid and orient the line
         image_centre = self.get_image_moment(order=1)
@@ -175,8 +202,7 @@ class Reader:
         y_axis = x_axis.orthogonal_line(origin)
 
         self.axis = (x_axis, y_axis)
-
-        return x_axis, y_axis
+        self.scale = np.linalg.norm(centres[1] - centres[0])
 
     def match_contours(self,
                        match_types: tp.List[str],
@@ -233,8 +259,9 @@ class Reader:
             return c
 
     def get_contour_area(self, c):
-        pg = shapely.geometry.Polygon(c.reshape(-1, 2))
-        return pg.area
+        return cv2.contourArea(c)
+        # pg = shapely.geometry.Polygon(c.reshape(-1, 2))
+        # return pg.area
 
     def get_contour_interior(self, c):
         c = c.reshape(-1, 2)
@@ -265,6 +292,7 @@ class Reader:
         self.image_orig = cv2.imread(str(filepath))
         self.reset_image()      # Copy image
         self.axis = None
+        self.scale = None
 
     def reset_image(self) -> None:
         self.image = self.image_orig.copy()
@@ -272,6 +300,9 @@ class Reader:
     def bgr_to_gray(self) -> None:
         """Convert image to greyscale."""
         self.image = cv2.cvtColor(self.image, self.color_to_grayscale)
+
+    def gray_to_bgr(self):
+        self.image = cv2.cvtColor(self.image, self.grayscale_to_color)
 
     def threshold(self, thresh_val: float = None) -> None:
         """Apply a fixed level threshold to each pixel.
@@ -327,8 +358,38 @@ class Reader:
 
         return contours
 
-    def draw(self, features):
-        image_draw = self.image_orig.copy()
+    def filter_contours(self, contours):
+        """Keep only the pixels inside the contours """
+
+        shape = (m, n) = self.image.shape[:2]
+        image_filter = np.zeros(shape, dtype=self.image.dtype)
+        image_filter = cv2.drawContours(image_filter, contours, -2, 255, cv2.FILLED)
+
+        self.image = np.fmin(self.image, image_filter)
+
+    def resample(self):
+        x_axis, y_axis = self.axis
+        origin = x_axis ^ y_axis
+        a = x_axis ^ (y_axis - self.scale * self.resample_x_max)
+        b = (x_axis - self.scale * self.resample_y_max) ^ y_axis
+
+        n_x = int(self.resample_x_max / self.resample_step_x)
+        n_y = int(self.resample_y_max / self.resample_step_y)
+
+        # Get the coordinates defining affine transform
+        source_pts = np.array([origin, a, b], dtype="float32")
+        target_pts = np.array([[0,n_y], [n_x, n_y], [0, 0]], dtype="float32")
+        mapping = cv2.getAffineTransform(source_pts, target_pts)
+
+        self.image = cv2.warpAffine(self.image, mapping, (n_x, n_y))
+
+    def image_to_point_cloud(self):
+        I, x = np.where(self.image)
+        y = self.image.shape[0] - I - 1
+        return np.hstack((x.reshape(-1,1), y.reshape(-1,1)))
+
+    def draw(self, features, image=None):
+        image_draw = image if image is not None else self.image_orig.copy()
         color_iterator = itertools.cycle(colors)
         lw = 1
 
@@ -339,7 +400,14 @@ class Reader:
             pt0, pt1 = x_axis.get_line_segment(image_draw)
             cv2.line(image_draw, pt0, pt1, color.bgr, lw)
 
+
             pt0, pt1 = y_axis.get_line_segment(image_draw)
+            cv2.line(image_draw, pt0, pt1, color.bgr, lw)
+
+            pt0, pt1 = (y_axis -self.scale * self.resample_x_max).get_line_segment(image_draw)
+            cv2.line(image_draw, pt0, pt1, color.bgr, lw)
+
+            pt0, pt1 = (x_axis -self.scale * self.resample_y_max).get_line_segment(image_draw)
             cv2.line(image_draw, pt0, pt1, color.bgr, lw)
 
             x0, y0 = self.get_image_moment()
@@ -364,8 +432,13 @@ class Reader:
         plt.show()
         plt.close(fig)
 
+    def show(self):
+        cv2.imshow("Current image", self.image)
+        cv2.waitKey(0)
+
     def read_image(self, filepath: pathlib.Path):
         self.load_image(filepath)
+        self.show()
 
         # Try to find the black markers in a fairly sharp image
         # First convert to binary grayscale image and convert
@@ -421,9 +494,34 @@ class Reader:
         self.threshold()
 
         features.update(self.match_contours(match_types=["graph_candidate"]))
+        graphs = features["graph_candidate"]
 
-        self.draw(features)
-        return features
+        # Reset and keep only graphs
+        self.reset_image()
+        self.bgr_to_gray()
+        self.invert()
+        self.filter_contours(graphs)
+        self.invert()
+
+        # Restore colors
+        self.gray_to_bgr()
+        self.draw(features, image=self.image)
+
+
+        self.reset_image()
+        self.bgr_to_gray()
+        self.invert()
+        self.filter_contours(graphs)
+        self.resample()
+        self.blur()
+        self.invert()
+        self.show()
+
+        self.invert()
+        return self.image_to_point_cloud()
+
+        # self.draw(features)
+        # return features
 
 
 def indices_in_window(x0, y0, x1, y1):
@@ -457,5 +555,8 @@ def rectangle_aspect(c):
 if __name__ == "__main__":
     reader = Reader()
 
-    filepath = pathlib.Path("data/scan3_sample2.png")
-    conts = reader.read_image(filepath)
+    # filepath = pathlib.Path("data/scan3_sample2.png")
+    # values = reader.read_image(filepath)
+
+    filepath = pathlib.Path("data/scan2.png")
+    values = reader.read_image(filepath)
