@@ -112,8 +112,8 @@ class Reader:
     thresh_val = 130
     thresh_maxval = 255
 
-    contour_mode: int = cv2.RETR_EXTERNAL
-    contour_method: int = cv2.CHAIN_APPROX_TC89_L1
+    contour_mode: int = cv2.RETR_EXTERNAL       # Retreive only the external contours
+    contour_method: int = cv2.CHAIN_APPROX_TC89_L1      # Apply a flavor of the Teh Chin chain approx algo
 
     draw_binary: bool = True
     draw_contours: bool = True
@@ -144,7 +144,7 @@ class Reader:
 
         # Best line coeeficients from the approximate null-vector
         svd = np.linalg.svd(A)
-        (c, a, b) = svd[-1][-1, :]
+        c, a, b = svd[-1][-1, :]
         centreline = Line(a, b, c)
 
         # Obtain a better fit using all four vertices of the rectangles
@@ -157,7 +157,7 @@ class Reader:
                 B[4*i + j, int(centreline <= pt)] = 1
 
         svd = np.linalg.svd(B)
-        (c, d, a, b) = svd[-1][-1, :]
+        c, d, a, b = svd[-1][-1, :]
 
         # Equation for x-axis -- best fit for centreline
         x_axis = Line(a, b, (c + d)/2)
@@ -315,7 +315,6 @@ class Reader:
         if iterations is None:
             iterations = self.morph_num_iter
 
-
     def invert(self) -> None:
         """Invert a binary greyscale image."""
         self.image = self.thresh_maxval - self.image
@@ -374,12 +373,9 @@ class Reader:
         self.invert()
         self.blur(3)
 
-
         # self.image = cv2.equalizeHist(self.image)       # Works wonders for low quality?
 
-
         self.threshold()
-
 
         horizontal = self.image.copy()
 
@@ -401,14 +397,15 @@ class Reader:
         smooth = cv2.blur(smooth, (2, 2))
 
         # 5 smooth.copyTo(src, edges)
-        horizontal = cv2.copyTo(smooth, edges)
+        # src, mask, dst -> dst
+        cv2.copyTo(smooth, horizontal, edges)       # I think this is right
 
         # from IPython import embed; embed()
-        self.plot(smooth)
+        self.plot(horizontal)
         self.image = smooth.copy()
 
-        self.morph(cv2.MORPH_CLOSE)
-        self.plot()
+        # self.morph(cv2.MORPH_CLOSE)   # Don't think I need this for nice images
+        # self.plot()
 
         features = self.match_contours(match_types=["marker"])
 
