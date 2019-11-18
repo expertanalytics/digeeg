@@ -1,5 +1,7 @@
 import numpy as np
+import cv2
 import shapely
+import typing as tp
 
 
 def angles_in_contour(contour: np.ndarray) -> np.ndarray:
@@ -32,6 +34,14 @@ def rectangle_aspect_ratio(contour: np.ndarray) -> float:
     return min(dx, dy) / max(dx, dy)
 
 
+def match_square(contour, tol=0.2):
+    """Return True if contour is approximately bounded by a square."""
+    x, y, w, h = cv2.boundingRect(contour)
+    if 1 - tol < w / h < 1 + tol:
+        return True
+    return False
+
+
 def contour_interior(contour: np.ndarray):
     contour = contour.reshape(-1, 2)
     x0, y0 = pg.min(axis=0)
@@ -46,3 +56,19 @@ def contour_interior(contour: np.ndarray):
 
     interior = pixels[inside]
     return interior
+
+
+def match_contours(
+    *,
+    matcher: tp.Callable,
+    contours: tp.Sequence[np.ndarray]
+) -> tp.List[tp.Any]:
+    matches = []
+
+    for c in contours:
+        match_result = matcher(c)
+        if match_result is not None:
+            matches.append(match_result)
+
+    if len(matches) > 0:
+        return matches

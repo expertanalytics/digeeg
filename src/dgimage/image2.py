@@ -1,154 +1,54 @@
-import typing as tp
-import pathlib
-import dataclasses
-import collections
-import itertools
-import enum
-
-import cv2
-import imutils
 import numpy as np
-
-import shapely.geometry
-
+import typing as tp
 import matplotlib.pyplot as plt
 
+import cv2
+import shapely.geometry
 
-class colors(enum.Enum):
+from dataclasses import dataclass
+from pathlib import Path
+from itertools import cycle
 
-    BLUE = (255, 0, 0)
-    GREEN = (0, 255, 0)
-    RED = (0, 0, 255)
+import imutils
 
-    @property
-    def bgr(self):
-        return self.value
+import collections
 
-    def dist(self, other) -> float:
-        return np.linalg.norm(np.array(self.value) - other)
+from dgutils import contour_interior, Line, angles_in_contour, rectangle_aspect_ratio, indices_in_window
+from .colors import colors
 
 
-@dataclasses.dataclass
-class Line:
-    """Oriented Lines in R^2. """
 
-    a: float
-    b: float
-    c: float
+@dataclass
+class Image2:
+    image_orig: np.ndarray
+    image: np.ndarray = None
+
+    # Do I need these here?
+    resample_x_max: float = 1.8
+    resample_y_max: float = 0.8
+    resample_step_x: float = 1/1000
+    resample_step_y: float = 1/1000
+    scale: float = 1
+
+    axis: tp.Tuple[np.ndarray, np.ndarray] = None
 
     def __post_init__(self):
-        if self.a == self.b == 0:
-            raise ValueError("Parameters 'a' and 'b' cannot both be zero.")
+        self.reset_image()
 
-        # Normalize -- Two lines are the same if parameters are the same up to
-        # a _positive_ scaling factor, left side is positive
+    def reset_image(self) -> None:
+        """Copy original image to image."""
+        self.image = self.image_orig.copy()
 
-        norm = np.linalg.norm(dataclasses.astuple(self)[:2])
-        self.a = self.a / norm
-        self.b = self.b / norm
-        self.c = self.c / norm
+    def reduce_contour(
+        self,
+        contour: np.ndarray,
+        *,
+        operation: tp.Callable[[np.ndarray], float]
+    ) -> float:
+        I, J = contour_interior(contour).T
+        return operation(self.image[J, I])
 
-    def __call__(self, point) -> float:
-        x, y = point
-        return self.a * x + self.b * y + self.c
-
-    def __neg__(self) -> "Line":
-        return self.__class__(-self.a, -self.b, -self.c)
-
-    def parallel_line(self, point) -> "Line":
-        """Returns the parallel line passing through (x, y). """
-
-        x, y = point
-        a, b, c = dataclasses.astuple(self)
-
-        # Orientation consistent with cross-product with pos. z-axis
-        return self.__class__(a, b, -a * x - b * y)
-
-    def orthogonal_line(self, point) -> "Line":
-        """Returns the orthogonal line passing through (x, y). """
-
-        x, y = point
-        a, b, c = dataclasses.astuple(self)
-
-        # Orientation consistent with cross-product with pos. z-axis
-        return self.__class__(-b, a, -a * y + b * x)
-
-    def project_point(self, point):
-        orth = self.orthogonal_line(point)
-        return self ^ orth
-
-    def get_line_segment(self, image):
-        """ Returns the line segment that intersects the image. """
-
-        # TODO: Fix for when line more closely aligns with y-axis
-        m, n = image.shape[:2]
-        a, b, c = dataclasses.astuple(self)
-        x0, y0 = (0, int(-c/b))
-        x1, y1 = (n, int(-(a*n + c)/b))
-        return ((x0, y0), (x1, y1))
-
-    def __add__(self, other):
-        a, b, c = dataclasses.astuple(self)
-        return self.__class__(a, b, c + float(other))
-
-    def __sub__(self, other):
-        a, b, c = dataclasses.astuple(self)
-        return self.__class__(a, b, c - float(other))
-
-    def __ge__(self, point):
-        return self(point) <= 0
-
-    def __le__(self, point):
-        return self(point) >= 0
-
-    def __gt__(self, point):
-        return self(point) < 0
-
-    def __lt__(self, point):
-        return self(point) > 0
-
-    def __xor__(self, other):
-        # Intersect
-        A = np.vstack((dataclasses.astuple(self),
-                       dataclasses.astuple(other)))
-
-        x = np.linalg.solve(A[:, :2], -A[:, 2])
-        return x
-
-
-@dataclasses.dataclass
-class Reader:
-    color_to_grayscale: int = cv2.COLOR_BGR2GRAY
-    grayscale_to_color: int = cv2.COLOR_GRAY2BGR
-
-    blur_kernel_size: tp.Tuple[int, int] = (3, 3)
-    blur_dist: int = 0
-
-    morph_kernel = np.ones((3, 3))
-    morph_num_iter = 1
-
-    thresh_val = 130
-    thresh_maxval = 255
-
-    contour_mode: int = cv2.RETR_EXTERNAL       # Retreive only the external contours
-    contour_method: int = cv2.CHAIN_APPROX_TC89_L1      # Apply a flavor of the Teh Chin chain approx algo
-
-    draw_binary: bool = True
-    draw_contours: bool = True
-    draw_axis: bool = True
-
-    marker_min_aspect = 0.5
-    marker_min_area = 100
-    marker_max_value = 100
-
-    rectangle_approx_tol = 0.04
-
-    resample_x_max = 1.8
-    resample_y_max = 0.8
-    resample_step_x = 1/1000
-    resample_step_y = 1/1000
-
-    def get_image_moment(self, order: int = 1):
+    def image_moment(self, order: int = 1):
         image = self.image
         if len(image.shape) > 2:
             image = np.mean(image, axis=2)
@@ -157,7 +57,7 @@ class Reader:
         v = np.mean(image)
         x0 = np.mean(image * np.arange(n)**order) / v
         y0 = np.mean(image * np.arange(m)[:, np.newaxis]**order) / v
-        return (x0, y0)
+        return x0, y0
 
     def get_axis(self, rectangles: tp.List[np.ndarray]):
         rectangles = [r.reshape(-1, 2) for r in rectangles]
@@ -190,7 +90,7 @@ class Reader:
         x_axis = Line(a, b, c)      # Why not (c + d) / 2
 
         # Get image gentroid and orient the line
-        image_centre = self.get_image_moment(order=1)
+        image_centre = self.image_moment(order=1)
         if x_axis >= image_centre:
             x_axis = -x_axis
 
@@ -212,7 +112,7 @@ class Reader:
         Return a dictionary of the matches with the match type as key. There can only
         be one matchtype per contour.
         """
-        contours = contours or self.get_contours()
+        contours = contours or self.find_contours()
 
         matchers = {type: getattr(self, f"match_{type}") for type in match_types}
         matches = collections.defaultdict(list)
@@ -232,7 +132,7 @@ class Reader:
 
         # create a closed polygonal approximation to `c` with the distance between them
         # less than `epsilon*perimeter`.
-        approx = cv2.approxPolyDP(c, self.rectangle_approx_tol*perimeter, True)
+        approx = cv2.approxPolyDP(c, 0.04*perimeter, True)
 
         if len(approx) == 4:
             angles = angles_in_contour(approx)
@@ -245,9 +145,9 @@ class Reader:
         rectangle = self.match_rectangle(c)
 
         if (rectangle is not None
-                and rectangle_aspect(rectangle) > self.marker_min_aspect
-                and self.get_contour_area(rectangle) > self.marker_min_area
-                and self.get_contour_mean_value(rectangle) < self.marker_max_value):
+                and rectangle_aspect_ratio(rectangle) > 0.5
+                and self.get_contour_area(rectangle) > 100
+                and self.get_contour_mean_value(rectangle) < 100):
             return rectangle
 
     def match_graph_candidate(self, c: np.ndarray) -> np.ndarray:
@@ -287,22 +187,19 @@ class Reader:
         max_value = self.image_orig[J, I].max()
         return max_value
 
-    def load_image(self, filepath: pathlib.Path) -> None:
+    def load_image(self, filepath: Path) -> None:
         self.filepath = filepath
         self.image_orig = cv2.imread(str(filepath))
         self.reset_image()      # Copy image
         self.axis = None
         self.scale = None
 
-    def reset_image(self) -> None:
-        self.image = self.image_orig.copy()
-
     def bgr_to_gray(self) -> None:
         """Convert image to greyscale."""
-        self.image = cv2.cvtColor(self.image, self.color_to_grayscale)
+        self.image = cv2.cvtColor(self.image, cv2.COLOR_BGR2GRAY)
 
     def gray_to_bgr(self):
-        self.image = cv2.cvtColor(self.image, self.grayscale_to_color)
+        self.image = cv2.cvtColor(self.image, cv2.COLOR_GRAY2BGR)
 
     def threshold(self, thresh_val: float = None) -> None:
         """Apply a fixed level threshold to each pixel.
@@ -314,11 +211,13 @@ class Reader:
 
         It is recommended to blur the image before binarisation.
         """
-        _, self.image = cv2.threshold(self.image, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
+        if thresh_val:
+            _, self.image = cv2.threshold(self.image, thresh_val, 255, cv2.THRESH_BINARY)
+        else:
+            _, self.image = cv2.threshold(self.image, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
 
-    def blur(self, kernel_size=None):
-        kernel_size = kernel_size or self.blur_kernel_size
-        self.image = cv2.blur(self.image, self.blur_kernel_size, self.blur_dist)
+    def blur(self, kernel_size: tp.Tuple[int, int], sigma: float):
+        self.image = cv2.GaussianBlur(self.image, kernel_size, sigma)
 
     def morph(self, transform, kernel=None, iterations=None):
         """
@@ -348,15 +247,26 @@ class Reader:
 
     def invert(self) -> None:
         """Invert a binary greyscale image."""
-        self.image = self.thresh_maxval - self.image
+        # TODO: How does invert work with thresh maxval
+        self.image = 255 - self.image
 
-    def get_contours(self, min_size: int = 6) -> tp.List[np.ndarray]:
+    def equalise(self):
+        self.image = cv2.equalizeHist(self.image)       # Works wonders for low quality?
+
+    def find_contours(
+        self,
+        min_size: int = 6,
+        contour_mode: int = cv2.RETR_EXTERNAL,
+        contour_method = cv2.CHAIN_APPROX_TC89_L1
+    ) -> tp.List[np.ndarray]:
         """Find contours in a binary image."""
-        contours = cv2.findContours(self.image, self.contour_mode, self.contour_method)
+        contours = cv2.findContours(self.image, contour_mode, contour_method)
         contours = imutils.grab_contours(contours)
         contours = list(filter(lambda c: c.size > min_size, contours))
-
         return contours
+
+    def set_axis(self, xaxis: np.ndarray, yaxis: np.ndarray):
+        self.axis = xaxis, yaxis
 
     def filter_contours(self, contours):
         """Keep only the pixels inside the contours """
@@ -381,7 +291,7 @@ class Reader:
         target_pts = np.array([[0,n_y], [n_x, n_y], [0, 0]], dtype="float32")
         mapping = cv2.getAffineTransform(source_pts, target_pts)
 
-        self.image = cv2.warpAffine(self.image, mapping, (n_x, n_y))
+        cv2.warpAffine(self.image, mapping, (n_x, n_y), dst=self.image)
 
     def image_to_point_cloud(self):
         I, x = np.where(self.image)
@@ -390,7 +300,7 @@ class Reader:
 
     def draw(self, features, image=None):
         image_draw = image if image is not None else self.image_orig.copy()
-        color_iterator = itertools.cycle(colors)
+        color_iterator = cycle(colors)
         lw = 1
 
         if self.axis:
@@ -410,12 +320,13 @@ class Reader:
             pt0, pt1 = (x_axis -self.scale * self.resample_y_max).get_line_segment(image_draw)
             cv2.line(image_draw, pt0, pt1, color.bgr, lw)
 
-            x0, y0 = self.get_image_moment()
+            x0, y0 = self.image_moment()
             cv2.circle(image_draw, (int(x0), int(y0)),  5, color.bgr)
             cv2.circle(image_draw, (int(x0), int(y0)), 25, color.bgr)
 
-        for contours in features.values():
+        for contours in features:
             color = next(color_iterator)
+            print(contours)
             image_draw = cv2.drawContours(image_draw, contours, -2, color.bgr, lw)
 
         cv2.imshow("Image", image_draw)
@@ -436,7 +347,7 @@ class Reader:
         cv2.imshow("Current image", self.image)
         cv2.waitKey(0)
 
-    def read_image(self, filepath: pathlib.Path):
+    def read_image(self, filepath: Path):
         self.load_image(filepath)
         self.show()
 
@@ -444,7 +355,7 @@ class Reader:
         # First convert to binary grayscale image and convert
         self.bgr_to_gray()
         self.invert()
-        self.blur(3)
+        self.blur((3, 3), 0)
 
         # self.image = cv2.equalizeHist(self.image)       # Works wonders for low quality?
 
@@ -473,7 +384,6 @@ class Reader:
         # src, mask, dst -> dst
         cv2.copyTo(smooth, horizontal, edges)       # I think this is right
 
-        # from IPython import embed; embed()
         self.plot(horizontal)
         self.image = smooth.copy()
 
@@ -496,6 +406,7 @@ class Reader:
         features.update(self.match_contours(match_types=["graph_candidate"]))
         graphs = features["graph_candidate"]
 
+
         # Reset and keep only graphs
         self.reset_image()
         self.bgr_to_gray()
@@ -505,58 +416,30 @@ class Reader:
 
         # Restore colors
         self.gray_to_bgr()
-        self.draw(features, image=self.image)
+        self.draw(graphs, image=self.image)
 
+        # self.reset_image()
+        # self.bgr_to_gray()
+        # self.invert()
+        # self.filter_contours(graphs)
+        # self.resample()
+        # self.blur()
+        # self.invert()
+        # self.show()
 
-        self.reset_image()
-        self.bgr_to_gray()
-        self.invert()
-        self.filter_contours(graphs)
-        self.resample()
-        self.blur()
-        self.invert()
-        self.show()
-
-        self.invert()
-        return self.image_to_point_cloud()
+        # self.invert()
+        # return self.image_to_point_cloud()
 
         # self.draw(features)
         # return features
 
 
-def indices_in_window(x0, y0, x1, y1):
-    I, J = np.meshgrid(np.arange(x0, x1+1), np.arange(y0, y1+1))
-    return np.hstack((I.reshape(-1, 1), J.reshape(-1,1)))
+def read_image2(filepath: Path) -> "Image":
+    image_array = cv2.imread(str(filepath))
+    return Image2(image_array)
 
 
-def angles_in_contour(c: np.ndarray) -> np.ndarray:
-    """Get angles of a convex contour. """
-    pg = c.reshape(-1, 2)
-    # Get normalized edge vectors
-    n = pg - np.roll(pg, -1, axis=0)
-    n = n / np.linalg.norm(n, axis=1).reshape(-1, 1)
-
-    # Compute cosine of exterior angles
-    # NOTE: Would need to handle sign for reentrant corners (use atan2)
-    r = np.clip((n * np.roll(n, -1, axis=0)).sum(axis=1), -1, 1)
-
-    # Get interior angles
-    angles = np.pi - np.arccos(r)
-    return angles
-
-
-def rectangle_aspect(c):
-    pg = c.reshape(-1, 2)
-    dx = np.linalg.norm(pg[1] - pg[0])
-    dy = np.linalg.norm(pg[3] - pg[0])
-    return min(dx, dy) / max(dx, dy)
-
-
-if __name__ == "__main__":
-    reader = Reader()
-
-    # filepath = pathlib.Path("data/scan3_sample2.png")
-    # values = reader.read_image(filepath)
-
-    filepath = pathlib.Path("data/scan1.png")
-    values = reader.read_image(filepath)
+def save_image(filepath: Path, image: "Image"):
+    success = cv2.imwrite(str(filepath.resolv()), image.get_image())
+    if not success:
+        raise IOError("Failed to save image")

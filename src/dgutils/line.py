@@ -1,4 +1,5 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, astuple
+import numpy as np
 
 
 @dataclass
@@ -16,7 +17,7 @@ class Line:
         # Normalize -- Two lines are the same if parameters are the same up to
         # a _positive_ scaling factor, left side is positive
 
-        norm = np.linalg.norm(dataclasses.astuple(self)[:2])
+        norm = np.linalg.norm(astuple(self)[:2])
         self.a = self.a / norm
         self.b = self.b / norm
         self.c = self.c / norm
@@ -32,7 +33,7 @@ class Line:
         """Returns the parallel line passing through (x, y). """
 
         x, y = point
-        a, b, c = dataclasses.astuple(self)
+        a, b, c = astuple(self)
 
         # Orientation consistent with cross-product with pos. z-axis
         return self.__class__(a, b, -a * x - b * y)
@@ -41,7 +42,7 @@ class Line:
         """Returns the orthogonal line passing through (x, y). """
 
         x, y = point
-        a, b, c = dataclasses.astuple(self)
+        a, b, c = astuple(self)
 
         # Orientation consistent with cross-product with pos. z-axis
         return self.__class__(-b, a, -a * y + b * x)
@@ -55,17 +56,17 @@ class Line:
 
         # TODO: Fix for when line more closely aligns with y-axis
         m, n = image.shape[:2]
-        a, b, c = dataclasses.astuple(self)
+        a, b, c = astuple(self)
         x0, y0 = (0, int(-c/b))
         x1, y1 = (n, int(-(a*n + c)/b))
         return ((x0, y0), (x1, y1))
 
     def __add__(self, other):
-        a, b, c = dataclasses.astuple(self)
+        a, b, c = astuple(self)
         return self.__class__(a, b, c + float(other))
 
     def __sub__(self, other):
-        a, b, c = dataclasses.astuple(self)
+        a, b, c = astuple(self)
         return self.__class__(a, b, c - float(other))
 
     def __ge__(self, point):
@@ -81,9 +82,8 @@ class Line:
         return self(point) > 0
 
     def __xor__(self, other):
-        # Intersect
-        A = np.vstack((dataclasses.astuple(self),
-                       dataclasses.astuple(other)))
-
+        # Intersection
+        A = np.vstack((astuple(self),
+                       astuple(other)))
         x = np.linalg.solve(A[:, :2], -A[:, 2])
         return x

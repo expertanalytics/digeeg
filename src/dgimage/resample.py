@@ -7,9 +7,6 @@ import shapely
 
 from collections import defaultdict
 
-# local stuff
-from dgimage import Image
-
 from dgutils import (
     angles_in_contour,
     rectangle_aspect_ratio,
@@ -17,7 +14,7 @@ from dgutils import (
     indices_in_window,
 )
 
-from dgresample import Line
+from dgutils import Line
 
 
 def match_rectangle(contour: np.ndarray, approximation_tolerance: float = 0.04):
@@ -36,7 +33,6 @@ def match_rectangle(contour: np.ndarray, approximation_tolerance: float = 0.04):
 
 
 def match_marker(
-    image: Image,
     contour: np.ndarray,
     min_aspect_ratio: float,    # 0.5
     min_area: float,            # 100
@@ -45,13 +41,29 @@ def match_marker(
     """Return rectange if it matches a square marker on the paper strip."""
     rectangle = match_rectangle(contour)
 
+    # if rectangle is not None:
+    #     foo = rectangle_aspect_ratio(rectangle) > min_aspect_ratio
+    #     bar = cv2.contourArea(rectangle)
+    #     foo > min_aspect_ratio, bar > min_area
+    #     # baz = image.reduce_contour(rectangle, operation=np.mean)
+    #     # print(baz)
+
     if (
         rectangle is not None and
         rectangle_aspect_ratio(rectangle) > min_aspect_ratio and
-        cv2.contourArea(rectangle) > min_area and
-        image.reduce_contour(rectangle, operation=np.mean) < max_value
+        cv2.contourArea(rectangle) > min_area
+        # and image.reduce_contour(rectangle, operation=np.mean) < max_value
     ):
         return rectangle
+
+
+def match_graph_candidate(contour: np.ndarray) -> np.ndarray:
+    """Return contour if it is poorly approximated by a circle."""
+    perimeter = cv2.arcLength(contour, True)
+    pg = shapely.geometry.Polygon(contour.reshape(-1, 2))
+    rel_area = 4*pg.area/perimeter**2
+    if rel_area < 0.1:
+        return contour
 
 
 def filter_match_contours(
@@ -116,21 +128,3 @@ def get_axis(image_centre: tp.Tuple[float, float], rectangles: tp.List[np.ndarra
     scale = np.linalg.norm(centres[1] - centres[0])
     return axis, scale
 
-
-def resample(axis):
-    x_axis, y_axis = axis
-
-    origin = x_axis ^ y_axis
-
-    a = x_axis ^ (y_axis - self.scale * self.resample_x_max)
-    b = (x_axis - self.scale * self.resample_y_max) ^ y_axis
-
-    n_x = int(self.resample_x_max / self.resample_step_x)
-    n_y = int(self.resample_y_max / self.resample_step_y)
-
-    # Get the coordinates defining affine transform
-    source_pts = np.array([origin, a, b], dtype="float32")
-    target_pts = np.array([[0,n_y], [n_x, n_y], [0, 0]], dtype="float32")
-    mapping = cv2.getAffineTransform(source_pts, target_pts)
-
-    self.image = cv2.warpAffine(self.image, mapping, (n_x, n_y))

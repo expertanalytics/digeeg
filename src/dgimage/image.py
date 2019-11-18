@@ -9,8 +9,7 @@ from itertools import cycle
 
 import imutils
 
-from dgutils import contour_interior
-from dgresample import Line
+from dgutils import contour_interior, Line
 from .colors import colors
 
 
@@ -43,7 +42,7 @@ class Image:
         self,
         contour: np.ndarray,
         *,
-        operation: tp.callable[[np.ndarray], float]
+        operation: tp.Callable[[np.ndarray], float]
     ) -> float:
         I, J = contour_interior(contour).T
         return operation(self.mage[J, I])
@@ -79,7 +78,7 @@ class Image:
 
         self.image = cv2.warpAffine(self.image, mapping, (n_x, n_y))        # dst = self.image?
 
-    def draw(self, features: tp.Sequence[np.ndarray], image: Image = None) -> None:
+    def draw(self, features: tp.Sequence[np.ndarray], image: "Image" = None) -> None:
         image_draw = image if image is not None else self.image_orig.copy()
         color_iterator = cycle(colors)
         lw = 1      # TODO: Line width?
@@ -190,12 +189,12 @@ class Image:
         return np.hstack((x.reshape(-1, 1), y.reshape(-1, 1)))
 
 
-def read_image(filepath: Path) -> Image:
+def read_image(filepath: Path) -> "Image":
     image_array = cv2.imread(str(filepath))
     return Image(image_array)
 
 
-def save_image(filepath: Path, image: Image):
+def save_image(filepath: Path, image: "Image"):
     success = cv2.imwrite(str(filepath.resolv()), image.get_image())
     if not success:
         raise IOError("Failed to save image")
