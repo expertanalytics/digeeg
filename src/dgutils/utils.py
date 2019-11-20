@@ -72,3 +72,82 @@ def match_contours(
 
     if len(matches) > 0:
         return matches
+
+
+def filter_contours(image: "Image", contours: tp.Sequence[np.ndarray]):
+    """Keep only the pixels inside the contours."""
+    if len(contours) == 0:
+        assert False, "No contours"
+
+    shape = (m, n) = image.image.shape[:2]
+    image_filter = np.zeros(shape, dtype=image.image.dtype)
+    image_filter = cv2.drawContours(image_filter, contours, -2, 255, cv2.FILLED)
+
+    _, binary_image = cv2.threshold(image.image, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
+    cv2.bitwise_and(image_filter, binary_image, dst=image.image)
+
+
+def remove_contours(image: "Image", contours: tp.Sequence[np.ndarray], fill_value: int = None):
+    """Remove the pixels inside the contours."""
+    if len(contours) == 0:
+        assert False, "No contours"
+    shape = m, n, *_ = image.image.shape
+
+    _fill_value = fill_value
+    if _fill_value is None:
+        _fill_value = np.argmax(np.bincount(image.image.ravel()))
+
+    image.image = cv2.drawContours(image.image, contours, -2, int(_fill_value), cv2.FILLED)
+
+
+def filter_image(image: "Image", binary_mask: np.ndarray, fill_value: int = None):
+    _fill_value = fill_value
+
+    if binary_mask.dtype != bool or not np.in1d(np.unique(binary_mask), (0, 1)).all():
+        assert False, "Binary mask must be boolean or contain only {0 1}."""
+
+    if _fill_value is None:
+        _fill_value = np.argmax(np.bincount(image.image.ravel()))
+
+    image.image[binary_mask] = _fill_value
+
+
+def get_square_matcher(*, approx_tolerance: float = 0.04, angle_tolerance: float = 0.1):
+    """Angle tolerance is in fractions of pi."""
+
+    def matcher(contour: np.ndarray):
+        perimeter = cv2.arcLength(contour, True)
+
+        # create a closed polygonal approximation to `c` with the distance between them
+        # less than `epsilon*perimeter`.
+        approx = cv2.approxPolyDP(contour, approx_tolerance*perimeter, True)
+        if len(approx) == 4:
+            angles = angles_in_contour(approx)
+            if max(abs(angles - np.pi/2)) < angle_tolerance*np.pi:       # 0.1
+                return approx
+    return matcher
+
+
+def get_bounding_rectangle_matcher():
+
+    def matcher(contour):
+        x, y, w, h = list(map(int, cv2.boundingRect(contour)))
+        aspect_ratio = float(w)/h
+
+        area = cv2.contourArea(contour)
+        hull = cv2.convexHull(contour)
+
+        hull_area = cv2.contourArea(hull)
+        solidity = float(area)/hull_area
+
+        (x, y),(MA, ma), angle = cv2.fitEllipse(contour)
+
+        slash = 20 < angle < 40
+        horisontal = 80 < angle < 100 or aspect_ratio > 1
+        solid = solidity > 0.5
+
+        if solid and (horisontal or slash):
+            rectangle = cv2.minAreaRect(contour)
+            rectangle_contour = np.int0(cv2.boxPoints(rectangle))
+            return rectangle_contour
+    return matcher

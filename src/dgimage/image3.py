@@ -35,9 +35,6 @@ class Image:
     blur_kernel_size: int = (3, 3)
     blur_dist: int = 0
 
-    morph_kernel = np.ones((3, 3))
-    morph_num_iter = 1
-
     thresh_val = 130
     thresh_maxval = 255
 
@@ -64,6 +61,14 @@ class Image:
 
     def __post_init__(self):
         self.reset_image()
+
+    def checkpoint(self):
+        """Set image_orig to current image."""
+        self.image_orig = self.image.copy()
+
+    def copy_image(self):
+        """Return a copy of `self.image`."""
+        return self.image.copy()
 
     def get_image_moment(self, order: int = 1):
         image = self.image
@@ -137,28 +142,6 @@ class Image:
         y_axis = x_axis.orthogonal_line(point)
         self.axis = (x_axis, y_axis)
         self.scale = np.linalg.norm(centres[1] - centres[0])
-
-    def match_contours(self,
-                       match_types: tp.List[str],
-                       contours: tp.List[np.ndarray] = None):
-        """Iterate over the contours and apply a classifying function to each contour.
-
-        Return a dictionary of the matches with the match type as key. There can only
-        be one matchtype per contour.
-        """
-        contours = contours or self.get_contours()
-
-        matchers = {type: getattr(self, f"match_{type}") for type in match_types}
-        matches = collections.defaultdict(list)
-
-        for c in contours:
-            for match_type, matcher in matchers.items():
-                match_result = matcher(c)
-                if match_result is not None:
-                    matches[match_type].append(match_result)
-                    break
-
-        return matches
 
     def match_rectangle(self, c: np.ndarray):
         """If `c` can be approximated by a square, return an approximation."""
@@ -247,10 +230,10 @@ class Image:
     def gaussian_blur(self, kernel_size: int):
         cv2.GaussianBlur(self.image, (kernel_size, kernel_size), 0, dst=self.image)
 
-    def blur(self, kernel_size: tp.Tuple[int, int]):
+    def blur(self, kernel_size: int):
         cv2.blur(self.image, (kernel_size, kernel_size), dst=self.image)
 
-    def morph(self, transform, kernel=None, iterations=None):
+    def morph(self, transform: int, kernel_size: tp.Tuple[int, int], iterations: int):
         """
         Valid transforms include:
          - cv2.MORPH_ERODE
@@ -259,9 +242,7 @@ class Image:
          - cv2.MORPH_DILATE
 
         """
-        if kernel is None:
-            kernel = self.morph_kernel
-        iterations = iterations or self.morph_num_iter
+        kernel = np.ones(kernel_size)
         self.image = cv2.morphologyEx(
             self.image,
             transform,
@@ -269,33 +250,22 @@ class Image:
             iterations=iterations
         )
 
-    def close(self, kernel=None, iterations=None):
-        if kernel is None:
-            kernel = self.morph_kernel
-
-        if iterations is None:
-            iterations = self.morph_num_iter
-
     def invert(self) -> None:
         """Invert a binary greyscale image."""
         self.image = self.thresh_maxval - self.image
 
     def get_contours(self, min_size: int = 6) -> tp.List[np.ndarray]:
         """Find contours in a binary image."""
+
+        mode = np.argmax(np.bincount(self.image.ravel()))
+        if mode == 0:
+            print(f"Consider inverting the image. The most common value is {mode}")
+
         contours = cv2.findContours(self.image, self.contour_mode, self.contour_method)
         contours = imutils.grab_contours(contours)
         contours = list(filter(lambda c: c.size > min_size, contours))
 
         return contours
-
-    def filter_contours(self, contours):
-        """Keep only the pixels inside the contours """
-        shape = (m, n) = self.image.shape[:2]
-        image_filter = np.zeros(shape, dtype=self.image.dtype)
-        image_filter = cv2.drawContours(image_filter, contours, -2, 255, cv2.FILLED)
-
-        _, binary_image = cv2.threshold(self.image, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
-        cv2.bitwise_and(image_filter, binary_image, dst=self.image)
 
     def resample(self):
         x_axis, y_axis = self.axis
@@ -322,10 +292,13 @@ class Image:
         y = self.image.shape[0] - I - 1
         return np.hstack((x.reshape(-1,1), y.reshape(-1,1)))
 
-    def draw(self, features, image=None, draw_axis=True, show=True):
-        image_draw = image if image is not None else self.image_orig.copy()
+    def draw(self, features, draw_axis=True, show=True):
         color_iterator = itertools.cycle(colors)
         lw = 1
+
+        image_draw = self.copy_image()
+        if len(image_draw.shape) < 3:
+            image_draw = cv2.cvtColor(image_draw, self.grayscale_to_color)
 
         if self.axis and not draw_axis:
             color = next(color_iterator)
@@ -347,11 +320,6 @@ class Image:
             cv2.circle(image_draw, (int(x0), int(y0)),  5, color.bgr)
             cv2.circle(image_draw, (int(x0), int(y0)), 25, color.bgr)
 
-        # try:
-        #     for contours in features.values():
-        #         color = next(color_iterator)
-        #         image_draw = cv2.drawContours(image_draw, contours, -2, color.bgr, lw)
-        # except AttributeError:
         color = next(color_iterator)
         image_draw = cv2.drawContours(image_draw, features, -2, color.bgr, lw)
 

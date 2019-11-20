@@ -49,7 +49,6 @@ def markers(image):
     image.save_image(Path("tmp/marked2.png"))
     # image.gray_to_bgr()
     # image.show(mode=cv2.WINDOW_NORMAL)
-    image.plot()
 
 
 def graphs(image):
@@ -59,19 +58,24 @@ def graphs(image):
     blur = cv2.blur(image.image, (1, 1))
     edges = cv2.Canny(blur, 100, 255)
 
+    fig, ax = plt.subplots(1)
+    # ax.imshow(blur, cmap="gray")
+    # plt.show()
+    # return
+
     contours = cv2.findContours(blur, contour_mode, contour_method)
     contours = imutils.grab_contours(contours)
     contours = list(filter(lambda c: c.size > 6, contours))
 
     features = match_contours(matcher=image.match_graph_candidate, contours=contours)
-    image.invert()
-    image.gray_to_bgr()
-    image.draw(features, image=image.image)
-    return
+    # image.invert()
+    # image.gray_to_bgr()
+    # image.draw(features, image=image.image)
+    # return
 
-    image_copy = image.image.copy()
     image.gaussian_blur(5)
     image.threshold()
+
     features = match_contours(matcher=image.match_graph_candidate, contours=contours)
     image.filter_contours(features)
     image.blur(3)
@@ -80,10 +84,15 @@ def graphs(image):
     contours = list(filter(lambda c: c.size > 6, contours))
     features = match_contours(matcher=image.match_graph_candidate, contours=contours)
 
+    # image.invert()
+    # image.gray_to_bgr()
+    # image.draw(features, image=image.image)
+    # return
+
     # Restore colors
     image.reset_image()
     image.bgr_to_gray()
-    # image.resample()
+    image.resample()
     image.filter_contours(features)
 
     # image.gray_to_bgr()

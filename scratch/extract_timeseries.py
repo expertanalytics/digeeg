@@ -4,17 +4,53 @@ from pathlib import Path
 import matplotlib.pyplot as plt
 import numpy as np
 import imutils
-from dgutils import match_contours
+
+from dgutils import (
+    match_contours,
+    filter_contours,
+    remove_contours,
+    filter_image,
+    get_square_matcher,
+    get_bounding_rectangle_matcher,
+)
+
+
+def plot(image_array):
+    fig, ax = plt.subplots(1)
+    ax.imshow(image_array, cmap="gray")
+    plt.show()
+    plt.close(fig)
+
+
+def remove_text(image):
+    features = markers(image)
+    image.get_axis(features)
+    image.resample()
+    preprocess(image)
+
+    contour_mode: int = cv2.RETR_EXTERNAL       # Retreive only the external contours
+    contour_method: int = cv2.CHAIN_APPROX_TC89_L1      # Apply a flavor of the Teh Chin chain approx algo
+
+    image_copy = image.image.copy()
+
+    contours = cv2.findContours(image_copy, contour_mode, contour_method)
+    contours = imutils.grab_contours(contours)
+    contours = list(filter(lambda c: c.size > 6, contours))
+
+    features = match_contours(matcher=image.match_graph_candidate, contours=contours)
+    image.filter_contours(features)
+
+    image.gray_to_bgr()
+    image_draw = image.draw(features, image.image)
+    return
 
 
 def preprocess(image):
     image.bgr_to_gray()
     image.invert()
-    image.blur(3)
     image.threshold()
 
-    image.blur(2)
-    structuring_element = cv2.getStructuringElement(cv2.MORPH_RECT, (3, 3))
+    structuring_element = cv2.getStructuringElement(cv2.MORPH_RECT, (2, 2))
     cv2.erode(image.image, structuring_element, dst=image.image)
     cv2.dilate(image.image, structuring_element, dst=image.image)
 
@@ -22,17 +58,16 @@ def preprocess(image):
     edges = cv2.adaptiveThreshold(image.image, 255, cv2.ADAPTIVE_THRESH_MEAN_C, cv2.THRESH_BINARY, 3, -2)
 
     # 2. Dilate edges
-    kernel = np.ones((2, 2))
+    kernel = np.ones((3, 3))
     edges = cv2.dilate(edges, kernel)
 
     # 4. blur smooth img
-    smooth = cv2.blur(image.image, (2, 2))
-
+    smooth = cv2.blur(image.image, (3, 3))
     # 5 smooth.copyTo(src, edges)
     # src, mask, dst -> dst
     cv2.copyTo(smooth, image.image, edges)       # I think this is right
     image.invert()
-    image.threshold()
+    image.checkpoint()
 
 
 def markers(image):
@@ -56,10 +91,12 @@ def markers(image):
     # Compute intersection of horisontal and vertical
     cv2.bitwise_and(horisontal_image, vertical_image, dst=image.image)
 
-    features = image.match_contours(match_types=["marker"])
-    print("Num markers: ", len(features["marker"]))
+    contours = image.get_contours()
+    features = match_contours(matcher=image.match_marker, contours=contours)
+
+    print("Num markers: ", len(features))
     image.reset_image()
-    return features["marker"]
+    return features
 
     # image.get_axis(features["marker"])
     # image.resample()
@@ -67,49 +104,56 @@ def markers(image):
 
 
 def extract_data(image):
-    fig, ax = plt.subplots(1)
-
+    image.invert()
     contour_mode: int = cv2.RETR_EXTERNAL       # Retreive only the external contours
     contour_method: int = cv2.CHAIN_APPROX_TC89_L1      # Apply a flavor of the Teh Chin chain approx algo
 
-    blur = cv2.blur(image.image, (1, 1))
-    edges = cv2.Canny(blur, 100, 255)
-
-    contours = cv2.findContours(blur, contour_mode, contour_method)
-    contours = imutils.grab_contours(contours)
-    contours = list(filter(lambda c: c.size > 6, contours))
-
-    features = match_contours(matcher=image.match_graph_candidate, contours=contours)
-    # image_draw = image.draw(contours, image=image.image, show=True)
-    # ax.imshow(image_draw, cmap="gray")
-    # plt.show()
-
-    image_copy = image.image.copy()
-    image.gaussian_blur(5)
-    image.threshold()
-
-    features = match_contours(matcher=image.match_graph_candidate, contours=contours)
-    image.filter_contours(features)
-    image.blur(3)
-    contours = cv2.findContours(blur, contour_mode, contour_method)
+    contours = cv2.findContours(image.image, contour_mode, contour_method)
     contours = imutils.grab_contours(contours)
     contours = list(filter(lambda c: c.size > 6, contours))
     features = match_contours(matcher=image.match_graph_candidate, contours=contours)
 
-    """
-    # Restore colors
+    filter_contours(image, features)
+
+    image.morph(cv2.MORPH_DILATE, (3, 3), 2)
+    image_mask = image.copy_image()
+
     image.reset_image()
-    image.bgr_to_gray()
-    image.resample()
+    filter_image(image, image_mask == 255)
 
-    image.filter_contours(features)
+    image_filter = image.copy_image()
 
-    # image.gray_to_bgr()
-    image_draw = image.draw(features, image.image)
-    image.show(image_draw)
-    """
+    image.invert()
+    image.morph(cv2.MORPH_DILATE, (2, 2), 2)
 
+    contours = cv2.findContours(image.image, contour_mode, contour_method)
+    contours = imutils.grab_contours(contours)
+    contours = list(filter(lambda c: c.shape[0] >= 5, contours))
 
+    # Compute all the bounding boxes and filter based on the aspect ratio?
+    features = match_contours(
+        matcher=get_bounding_rectangle_matcher(),
+        contours=contours
+    )
+    filter_contours(image, features)
+    image_mask = image.copy_image()
+    image.reset_image()
+    filter_image(image, image_mask == 255)
+
+    image.invert()
+    image.morph(cv2.MORPH_DILATE, (3, 3), 2)
+
+    contours = cv2.findContours(image.image, contour_mode, contour_method)
+    contours = imutils.grab_contours(contours)
+    contours = list(filter(lambda c: c.size > 6, contours))
+
+    features = match_contours(matcher=image.match_graph_candidate, contours=contours)
+    filter_contours(image, features)
+    image.invert()
+
+    image_draw = image.draw(features)
+    image.reset_image()
+    image_draw = image.draw(features) 
 
 def foo(image):
     # Reorient the image to align with axis
@@ -134,6 +178,8 @@ if __name__ == "__main__":
     #     foo(image)
 
     # filename = "../data/scan3_sample.png"
-    filename = "tmp_split_images/split4.png"
+    filename = "tmp_split_images/split1.png"
     image = read_image(filename)
+
     foo(image)
+    # remove_text(image)
