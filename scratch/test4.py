@@ -1,4 +1,4 @@
-from dgimage import Image, read_image
+from dgimage import Image, read_image, save_image
 from pathlib import Path
 from scipy import interpolate
 from scipy import stats
@@ -111,27 +111,14 @@ def split_image(image):
             new_image = image.image[min_index:max_index, :]
         new_image_list.append(new_image)
         rectangle_indices += 1
-
-    for image in new_image_list:
-        plt.imshow(image)
-        plt.show()
-        plt.close()
     return new_image_list
 
 
 if __name__ == "__main__":
-    # image = Image()
-    # filepath = Path("../data/scan4.png")
-    filepath = Path("../data/scan3_sample.png")
-    # image.load_image(filepath)
+    filepath = Path("../data/scan4.png")
+    # filepath = Path("../data/scan3_sample.png")
+
     image = read_image(filepath)
-    split_image(image)
-
-
-
-    # markers(image)
-    # plt.imshow(image.image)
-    # image.show()
-
-    # preprocess(image)
-    # image.plot()
+    image_list = split_image(image)
+    for i, image in enumerate(image_list):
+        save_image(Path("tmp_split_images") / f"split{i}.png", Image(image))

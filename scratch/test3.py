@@ -1,4 +1,4 @@
-from dgimage import Image
+from dgimage import Image, read_image
 from pathlib import Path
 from scipy import interpolate
 from scipy import stats
@@ -64,6 +64,10 @@ def graphs(image):
     contours = list(filter(lambda c: c.size > 6, contours))
 
     features = match_contours(matcher=image.match_graph_candidate, contours=contours)
+    image.invert()
+    image.gray_to_bgr()
+    image.draw(features, image=image.image)
+    return
 
     image_copy = image.image.copy()
     image.gaussian_blur(5)
@@ -110,14 +114,13 @@ def extract(image):
 
 
 if __name__ == "__main__":
-    image = Image()
     filepath = Path("../data/scan4.png")
-    image.load_image(filepath)
+    image = read_image(filepath)
     # plt.imshow(image.image)
     # image.show()
 
     preprocess(image)
     markers(image)
-    # graphs(image)
+    graphs(image)
 
     # extract(image)
