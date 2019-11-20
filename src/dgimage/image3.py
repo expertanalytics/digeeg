@@ -3,7 +3,13 @@ from pathlib import Path
 import dataclasses
 import collections
 import itertools
-import enum
+
+import operator
+
+from dgutils import (
+    rectangle_aspect_ratio,
+    angles_in_contour,
+)
 
 import cv2
 import imutils
@@ -16,25 +22,13 @@ import matplotlib.pyplot as plt
 
 from dgutils import Line
 
-
-class colors(enum.Enum):
-
-    BLUE = (255, 0, 0)
-    GREEN = (0, 255, 0)
-    RED = (0, 0, 255)
-
-    @property
-    def bgr(self):
-        return self.value
-
-    def dist(self, other) -> float:
-        return np.linalg.norm(np.array(self.value) - other)
+from .colors import colors
 
 
 @dataclasses.dataclass
 class Image:
+    image_orig: np.ndarray
     image: np.ndarray = None
-    image_orig: np.ndarray = None
 
     grayscale_to_color: int = cv2.COLOR_GRAY2BGR
 
@@ -60,10 +54,16 @@ class Image:
 
     rectangle_approx_tol = 0.04
 
-    resample_x_max = 1.8
+    resample_x_max = 2.0
     resample_y_max = 0.8
     resample_step_x = 1/1000
     resample_step_y = 1/1000
+
+    axis = None
+    scale = None
+
+    def __post_init__(self):
+        self.reset_image()
 
     def get_image_moment(self, order: int = 1):
         image = self.image
@@ -77,6 +77,8 @@ class Image:
         return (x0, y0)
 
     def get_axis(self, rectangles: tp.List[np.ndarray]):
+        if len(rectangles) < 2:
+            assert False, "Cannot scale axis based on only one marker."
         rectangles = [r.reshape(-1, 2) for r in rectangles]
 
         # First get best line fitting the marker centres
@@ -113,13 +115,26 @@ class Image:
         if x_axis >= image_centre:
             x_axis = -x_axis
 
-        # Place a preliminary y-axis
+        # Place a preliminary y-axis at the image centre
         y_axis_prelim = x_axis.orthogonal_line(image_centre)
 
-        # Place origin on the first marker along the oriented x-axis
-        origin = sorted(centres, key=y_axis_prelim)[0]
-        y_axis = x_axis.orthogonal_line(origin)
+        w, h, *_ = self.image.shape
+        if w / h > 1:       # Figure out the orientation of the image
+            # Where does the x-axis intersect the image border?
+            intersection = -x_axis.b*w/x_axis.a - x_axis.c/x_axis.a
+            # Set y-axis at the correct image border
+            if y_axis_prelim >= (intersection, w):
+                point = (intersection, w)
+            else:
+                point = (intersection, 0)
+        else:       # w / h < 1
+            intersection = -x_axis.c/x_axis.b
+            if y_axis_prelim >= (0, intersection):
+                point = (0, intersection)
+            else:
+                point = (h, intersection)
 
+        y_axis = x_axis.orthogonal_line(point)
         self.axis = (x_axis, y_axis)
         self.scale = np.linalg.norm(centres[1] - centres[0])
 
@@ -156,7 +171,7 @@ class Image:
         if len(approx) == 4:
             angles = angles_in_contour(approx)
             # Check angles for rectangle
-            if max(abs(angles - np.pi/2)) < 0.1  * np.pi:
+            if max(abs(angles - np.pi/2)) < 0.1  * np.pi:       # 0.1
                 return approx
 
     def match_marker(self, c: np.ndarray) -> np.ndarray:
@@ -164,7 +179,7 @@ class Image:
         rectangle = self.match_rectangle(c)
 
         if (rectangle is not None
-                and rectangle_aspect(rectangle) > self.marker_min_aspect
+                and rectangle_aspect_ratio(rectangle) > self.marker_min_aspect
                 and self.get_contour_area(rectangle) > self.marker_min_area
                 and self.get_contour_mean_value(rectangle) < self.marker_max_value):
             return rectangle
@@ -179,15 +194,13 @@ class Image:
 
     def get_contour_area(self, c):
         return cv2.contourArea(c)
-        # pg = shapely.geometry.Polygon(c.reshape(-1, 2))
-        # return pg.area
 
     def get_contour_interior(self, c):
-        c = c.reshape(-1, 2)
-        x0, y0 = c.min(axis=0)
-        x1, y1 = c.max(axis=0)
+        _c = c.reshape(-1, 2)
+        x0, y0 = _c.min(axis=0)
+        x1, y1 = _c.max(axis=0)
 
-        pg = shapely.geometry.Polygon(c)
+        pg = shapely.geometry.Polygon(_c)
 
         pixels = indices_in_window(x0, y0, x1, y1)
         inside = [i for (i, pix) in enumerate(pixels)
@@ -205,13 +218,6 @@ class Image:
         I, J = self.get_contour_interior(c).T
         max_value = self.image_orig[J, I].max()
         return max_value
-
-    def load_image(self, filepath: Path) -> None:
-        self.filepath = filepath
-        self.image_orig = cv2.imread(str(filepath))
-        self.reset_image()      # Copy image
-        self.axis = None
-        self.scale = None
 
     def reset_image(self) -> None:
         self.image = self.image_orig.copy()
@@ -303,35 +309,21 @@ class Image:
         n_x = int(self.resample_x_max / self.resample_step_x)
         n_y = int(self.resample_y_max / self.resample_step_y)
 
-        self.invert()
-        self.gray_to_bgr()
-
-        pt0, pt1 = x_axis.get_line_segment(self.image)
-        cv2.line(self.image, pt0, pt1, (255, 0, 0), 10)
-
-        pt0, pt1 = y_axis.get_line_segment(self.image)
-        cv2.line(self.image, pt0, pt1, (0, 0, 255), 10)
-
-        cv2.circle(self.image, tuple(map(int, a)),  5, (255, 0, 0), -100)
-        cv2.circle(self.image, tuple(map(int, b)),  5, (0, 255, 0), -100)
-        cv2.circle(self.image, tuple(map(int, origin)),  5, (0, 0, 255), -100)
-
-        self.plot()
-        assert False
-
         # Get the coordinates defining affine transform
         source_pts = np.array([origin, a, b], dtype="float32")
         target_pts = np.array([[0,n_y], [n_x, n_y], [0, 0]], dtype="float32")
         mapping = cv2.getAffineTransform(source_pts, target_pts)
 
+        self.invert()
         self.image = cv2.warpAffine(self.image, mapping, (n_x, n_y))
+        self.invert()
 
     def image_to_point_cloud(self):
         I, x = np.where(self.image)
         y = self.image.shape[0] - I - 1
         return np.hstack((x.reshape(-1,1), y.reshape(-1,1)))
 
-    def draw(self, features, image=None, draw_axis=True):
+    def draw(self, features, image=None, draw_axis=True, show=True):
         image_draw = image if image is not None else self.image_orig.copy()
         color_iterator = itertools.cycle(colors)
         lw = 1
@@ -356,16 +348,18 @@ class Image:
             cv2.circle(image_draw, (int(x0), int(y0)),  5, color.bgr)
             cv2.circle(image_draw, (int(x0), int(y0)), 25, color.bgr)
 
-        try:
-            for contours in features.values():
-                color = next(color_iterator)
-                image_draw = cv2.drawContours(image_draw, contours, -2, color.bgr, lw)
-        except AttributeError:
-            color = next(color_iterator)
-            image_draw = cv2.drawContours(image_draw, features, -2, color.bgr, lw)
+        # try:
+        #     for contours in features.values():
+        #         color = next(color_iterator)
+        #         image_draw = cv2.drawContours(image_draw, contours, -2, color.bgr, lw)
+        # except AttributeError:
+        color = next(color_iterator)
+        image_draw = cv2.drawContours(image_draw, features, -2, color.bgr, lw)
 
-        cv2.imshow("Image", image_draw)
-        cv2.waitKey(0)
+        if show:
+            cv2.imshow("Image", image_draw)
+            cv2.waitKey(0)
+            cv2.destroyAllWindows()
         return image_draw
 
     def save_image(self, filepath: Path):
@@ -392,55 +386,9 @@ class Image:
         plt.show()
         plt.close(fig)
 
-    def do_stuff(self):
-        # from IPython import embed; embed()
-        # self.plot()
-
-        # self.morph(cv2.MORPH_CLOSE)   # Don't think I need this for nice images
-        # self.plot()
-
-        features = self.match_contours(match_types=["marker"])
-
-        # Now we can find axes
-        markers = features["marker"]
-        self.get_axis(markers)
-
-        # Reset and find graphs
-        self.reset_image()
-        self.bgr_to_gray()
-        self.invert()
-        # self.blur(3)
-        self.threshold()
-
-        features.update(self.match_contours(match_types=["graph_candidate"]))
-        graphs = features["graph_candidate"]
-
-        # Reset and keep only graphs
-        self.reset_image()
-        self.bgr_to_gray()
-        self.invert()
-        self.filter_contours(graphs)
-        self.invert()
-
-        # Restore colors
-        self.gray_to_bgr()
-        self.draw(features, image=self.image)
-
-
-        # self.reset_image()
-        # self.bgr_to_gray()
-        # self.invert()
-        # self.filter_contours(graphs)
-        # self.resample()
-        # self.blur(3)
-        # self.invert()
-        # self.show()
-
-        # self.invert()
-        # return self.image_to_point_cloud()
-
-        # self.draw(features)
-        # return features
+    def get_image(self):
+        """Get image array."""
+        return self.image
 
 
 def indices_in_window(x0, y0, x1, y1):
@@ -448,34 +396,19 @@ def indices_in_window(x0, y0, x1, y1):
     return np.hstack((I.reshape(-1, 1), J.reshape(-1,1)))
 
 
-def angles_in_contour(c: np.ndarray) -> np.ndarray:
-    """Get angles of a convex contour. """
-    pg = c.reshape(-1, 2)
-    # Get normalized edge vectors
-    n = pg - np.roll(pg, -1, axis=0)
-    n = n / np.linalg.norm(n, axis=1).reshape(-1, 1)
-
-    # Compute cosine of exterior angles
-    # NOTE: Would need to handle sign for reentrant corners (use atan2)
-    r = np.clip((n * np.roll(n, -1, axis=0)).sum(axis=1), -1, 1)
-
-    # Get interior angles
-    angles = np.pi - np.arccos(r)
-    return angles
+def read_image(filepath: Path) -> Image:
+    image_array = cv2.imread(str(filepath))
+    return Image(image_array)
 
 
-def rectangle_aspect(c):
-    pg = c.reshape(-1, 2)
-    dx = np.linalg.norm(pg[1] - pg[0])
-    dy = np.linalg.norm(pg[3] - pg[0])
-    return min(dx, dy) / max(dx, dy)
+def save_image(filepath: Path, image: Image):
+    success = cv2.imwrite(str(filepath.resolve()), image.get_image())
+    if not success:
+        raise IOError("Failed to save image")
 
 
 if __name__ == "__main__":
-    reader = Image()
-
-    # filepath = pathlib.Path("data/scan3_sample2.png")
-    # values = reader.read_image(filepath)
-
     filepath = Path("data/scan1.png")
-    values = reader.read_image(filepath)
+    reader = read_image(filepath)
+    values = reader.do_stuff()
+

@@ -53,10 +53,22 @@ class Line:
 
     def get_line_segment(self, image):
         """ Returns the line segment that intersects the image. """
-
         # TODO: Fix for when line more closely aligns with y-axis
         m, n = image.shape[:2]
         a, b, c = astuple(self)
+
+        if abs(a) < 0.01:
+            print("Returning line segment parallel to y-axis.")
+            x0, y0 = (0, int(-c/b))
+            x1, y1 = (n, int(-c/b))
+            return ((x0, y0), (x1, y1))
+
+        if abs(b) < 0.01:
+            print("Returning line segment parallel to x-axis.")
+            x0, y0 = (int(-c/a), 0)
+            x1, y1 = (int(-c/a), m)
+            return ((x0, y0), (x1, y1))
+
         x0, y0 = (0, int(-c/b))
         x1, y1 = (n, int(-(a*n + c)/b))
         return ((x0, y0), (x1, y1))
