@@ -290,13 +290,12 @@ class Image:
 
     def filter_contours(self, contours):
         """Keep only the pixels inside the contours """
-
         shape = (m, n) = self.image.shape[:2]
         image_filter = np.zeros(shape, dtype=self.image.dtype)
         image_filter = cv2.drawContours(image_filter, contours, -2, 255, cv2.FILLED)
 
-        image_mask = image_filter < self.image
-        self.image[image_mask] = 255
+        _, binary_image = cv2.threshold(self.image, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
+        cv2.bitwise_and(image_filter, binary_image, dst=self.image)
 
     def resample(self):
         x_axis, y_axis = self.axis
@@ -379,6 +378,7 @@ class Image:
         # cv2.namedWindow("ImageShow", cv2.WINDOW_NORMAL)
         cv2.imshow("ImageShow", _image_show)
         cv2.waitKey(0)
+        cv2.destroyAllWindows()
 
     def plot(self):
         fig, ax = plt.subplots(1)
