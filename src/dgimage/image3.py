@@ -60,11 +60,12 @@ class Image:
     scale = None
 
     def __post_init__(self):
+        self.checkpoint_dict: tp.Dict[str, np.ndarray] = dict()
         self.reset_image()
 
-    def checkpoint(self):
+    def checkpoint(self, tag: str):
         """Set image_orig to current image."""
-        self.image_orig = self.image.copy()
+        self.checkpoint_dict[tag] = self.copy_image()
 
     def copy_image(self):
         """Return a copy of `self.image`."""
@@ -202,8 +203,10 @@ class Image:
         max_value = self.image_orig[J, I].max()
         return max_value
 
-    def reset_image(self) -> None:
-        self.image = self.image_orig.copy()
+    def reset_image(self, tag: str = None) -> None:
+
+        self.image = self.checkpoint_dict.get(tag, self.image_orig).copy()
+        # self.image = self.image_orig.copy()
 
     def bgr_to_gray(self) -> None:
         """Convert image to greyscale."""
@@ -256,11 +259,6 @@ class Image:
 
     def get_contours(self, min_size: int = 6) -> tp.List[np.ndarray]:
         """Find contours in a binary image."""
-
-        mode = np.argmax(np.bincount(self.image.ravel()))
-        if mode == 0:
-            print(f"Consider inverting the image. The most common value is {mode}")
-
         contours = cv2.findContours(self.image, self.contour_mode, self.contour_method)
         contours = imutils.grab_contours(contours)
         contours = list(filter(lambda c: c.size > min_size, contours))
