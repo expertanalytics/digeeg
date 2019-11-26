@@ -8,8 +8,21 @@ from .utils import (
     filter_contours,
     remove_contours,
     filter_image,
-    get_square_matcher,
     get_bounding_rectangle_matcher,
+    get_contour_interior,
+    plot,
+    get_contour_max_value,
+    get_contour_mean_value,
+    get_contours,
 )
 
-from .line import Line
+from .matchers import (
+    get_marker_matcher,
+    get_graph_matcher,
+    get_square_matcher,
+)
+
+from .plots import (
+    plot,
+    show,
+)

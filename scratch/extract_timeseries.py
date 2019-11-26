@@ -1,5 +1,5 @@
 import cv2
-from dgimage import Image, read_image, save_image
+from dgimage import Image, read_image, save_image, resample, get_axis
 from pathlib import Path
 import matplotlib.pyplot as plt
 import numpy as np
@@ -12,6 +12,9 @@ from dgutils import (
     filter_image,
     get_square_matcher,
     get_bounding_rectangle_matcher,
+    get_contours,
+    get_marker_matcher,
+    get_graph_matcher,
 )
 
 
@@ -68,8 +71,8 @@ def markers(image):
     # Compute intersection of horisontal and vertical
     cv2.bitwise_and(horisontal_image, vertical_image, dst=image.image)
 
-    contours = image.get_contours()
-    features = match_contours(matcher=image.match_marker, contours=contours)
+    contours = get_contours(image)
+    features = match_contours(matcher=get_marker_matcher(image), contours=contours)
 
     print("Num markers: ", len(features))
     return features
@@ -85,10 +88,8 @@ def extract_data2(image):
     ######################################################################################
     image.invert()
 
-    contours = cv2.findContours(image.image, contour_mode, contour_method)
-    contours = imutils.grab_contours(contours)
-    contours = list(filter(lambda c: c.size > 6, contours))
-    features = match_contours(matcher=image.match_graph_candidate, contours=contours)
+    contours = get_contours(image)
+    features = match_contours(matcher=get_graph_matcher(), contours=contours)
     remove_contours(image, features)
 
     #####################################################################################
@@ -99,9 +100,7 @@ def extract_data2(image):
     image.threshold(100)
     image.morph(cv2.MORPH_DILATE, (3, 3), 3)
 
-    contours = cv2.findContours(image.image, contour_mode, contour_method)
-    contours = imutils.grab_contours(contours)
-    contours = list(filter(lambda c: c.shape[0] >= 5, contours))
+    contours = get_contours(image, min_size=5)
 
     # Compute all the bounding boxes and filter based on the aspect ratio?
     features = match_contours(
@@ -127,17 +126,14 @@ def extract_data2(image):
 
     image.morph(cv2.MORPH_DILATE, (3, 3), 2)
 
-    contours = cv2.findContours(image.image, contour_mode, contour_method)
-    contours = imutils.grab_contours(contours)
-    contours = list(filter(lambda c: c.size > 6, contours))
+    contours = get_contours(image)
 
-    features = match_contours(matcher=image.match_graph_candidate, contours=contours)
+    features = match_contours(matcher=get_graph_matcher(), contours=contours)
     filter_contours(image, features)
     image.invert()
 
-    image_draw = image.draw(features)
     image.reset_image("resampled")
-    image_draw = image.draw(features)
+    image.draw(features)
 
 
 def extract_data(image):
@@ -145,16 +141,13 @@ def extract_data(image):
     contour_mode: int = cv2.RETR_EXTERNAL       # Retreive only the external contours
     contour_method: int = cv2.CHAIN_APPROX_TC89_L1      # Apply a flavor of the Teh Chin chain approx algo
 
-    contours = cv2.findContours(image.image, contour_mode, contour_method)
-    contours = imutils.grab_contours(contours)
-    contours = list(filter(lambda c: c.size > 6, contours))
-    features = match_contours(matcher=image.match_graph_candidate, contours=contours)
+    contours = get_contours(image)
+    features = match_contours(matcher=get_graph_matcher(), contours=contours)
 
     filter_contours(image, features)
 
     image.morph(cv2.MORPH_DILATE, (3, 3), 2)
     image_mask = image.copy_image()
-    image.show()
 
     filter_image(image, image_mask == 255)
 
@@ -163,9 +156,7 @@ def extract_data(image):
     image.invert()
     image.morph(cv2.MORPH_DILATE, (2, 2), 2)
 
-    contours = cv2.findContours(image.image, contour_mode, contour_method)
-    contours = imutils.grab_contours(contours)
-    contours = list(filter(lambda c: c.shape[0] >= 5, contours))
+    contours = get_contours(image)
 
     # Compute all the bounding boxes and filter based on the aspect ratio?
     features = match_contours(
@@ -180,15 +171,12 @@ def extract_data(image):
     image.invert()
     image.morph(cv2.MORPH_DILATE, (3, 3), 2)
 
-    contours = cv2.findContours(image.image, contour_mode, contour_method)
-    contours = imutils.grab_contours(contours)
-    contours = list(filter(lambda c: c.size > 6, contours))
+    contours = get_contours(image)
 
-    features = match_contours(matcher=image.match_graph_candidate, contours=contours)
+    features = match_contours(matcher=get_graph_matcher(), contours=contours)
     filter_contours(image, features)
     image.invert()
 
-    image_draw = image.draw(features)
     image.reset_image()
     image_draw = image.draw(features)
 
@@ -196,9 +184,12 @@ def extract_data(image):
 def foo(image):
     # Reorient the image to align with axis
     features = markers(image)
-    image.get_axis(features)
+    axis, scale = get_axis(image, features)
+    image.set_axis(axis)
+    image.set_scale(scale)
+
     image.reset_image()
-    image.resample()
+    resample(image)
 
     image.bgr_to_gray()
     image.checkpoint("resampled")
@@ -217,7 +208,7 @@ if __name__ == "__main__":
     #     foo(image)
 
     # filename = "../data/scan3_sample.png"
-    filename = "tmp_split_images/split3.png"
+    filename = "tmp_split_images/split1.png"
     image = read_image(filename)
 
     foo(image)

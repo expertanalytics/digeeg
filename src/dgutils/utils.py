@@ -2,6 +2,8 @@ import numpy as np
 import cv2
 import shapely
 import typing as tp
+import imutils
+from dgimage import Image
 
 
 def angles_in_contour(contour: np.ndarray) -> np.ndarray:
@@ -112,22 +114,6 @@ def filter_image(image: "Image", binary_mask: np.ndarray, fill_value: int = None
     image.image[binary_mask] = _fill_value
 
 
-def get_square_matcher(*, approx_tolerance: float = 0.04, angle_tolerance: float = 0.1):
-    """Angle tolerance is in fractions of pi."""
-
-    def matcher(contour: np.ndarray):
-        perimeter = cv2.arcLength(contour, True)
-
-        # create a closed polygonal approximation to `c` with the distance between them
-        # less than `epsilon*perimeter`.
-        approx = cv2.approxPolyDP(contour, approx_tolerance*perimeter, True)
-        if len(approx) == 4:
-            angles = angles_in_contour(approx)
-            if max(abs(angles - np.pi/2)) < angle_tolerance*np.pi:       # 0.1
-                return approx
-    return matcher
-
-
 def get_bounding_rectangle_matcher():
 
     def matcher(contour):
@@ -151,3 +137,66 @@ def get_bounding_rectangle_matcher():
             rectangle_contour = np.int0(cv2.boxPoints(rectangle))
             return rectangle_contour
     return matcher
+
+
+def get_contour_interior(contour: np.ndarray) -> np.ndarray:
+    _c = contour.reshape(-1, 2)
+    x0, y0 = _c.min(axis=0)
+    x1, y1 = _c.max(axis=0)
+
+    pg = shapely.geometry.Polygon(_c)
+
+    pixels = indices_in_window(x0, y0, x1, y1)
+    inside = [i for (i, pix) in enumerate(pixels)
+              if pg.contains(shapely.geometry.Point(pix))]
+
+    interior = pixels[inside]
+    return interior
+
+
+def get_contour_max_value(image: "Image", contour: np.ndarray) -> float:
+    I, J = get_contour_interior(contour).T
+    max_value = image.image_orig[J, I].max()
+    return max_value
+
+
+def get_contour_mean_value(self, c: np.ndarray) -> float:
+    I, J = get_contour_interior(c).T
+    mean_value = self.image_orig[J, I].mean()
+    return mean_value
+
+
+def image_to_point_cloud(image: "Image") -> np.ndarray:
+    """Return a scatterpolot of the image."""
+    I, x = np.where(image.image)
+    y = image.image.shape[0] - I - 1
+    return np.hstack((x.reshape(-1,1), y.reshape(-1,1)))
+
+
+def get_contours(
+    image: "Image",
+    min_size: int = 6,
+    contour_mode: int = cv2.RETR_EXTERNAL,       # Retreive only the external contours
+    contour_method: int = cv2.CHAIN_APPROX_TC89_L1      # Apply a flavor of the Teh Chin chain approx algo
+) -> tp.List[np.ndarray]:
+
+    """Find contours in a binary image."""
+    contours = cv2.findContours(image.image, contour_mode, contour_method)
+    contours = imutils.grab_contours(contours)
+    contours = list(filter(lambda c: c.size > min_size, contours))
+    return contours
+
+
+def match_rectangle(c: np.ndarray, rectangle_approx_tol: float = 0.04):
+    """If `c` can be approximated by a square, return an approximation."""
+    perimeter = cv2.arcLength(c, True)
+
+    # create a closed polygonal approximation to `c` with the distance between them
+    # less than `epsilon*perimeter`.
+    approx = cv2.approxPolyDP(c, rectangle_approx_tol*perimeter, True)
+
+    if len(approx) == 4:
+        angles = angles_in_contour(approx)
+        # Check angles for rectangle
+        if max(abs(angles - np.pi/2)) < 0.1  * np.pi:       # 0.1
+            return approx
