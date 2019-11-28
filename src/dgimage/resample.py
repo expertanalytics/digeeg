@@ -74,17 +74,25 @@ def get_axis(image: Image, rectangles: tp.List[np.ndarray]):
     return axis, scale
 
 
-def resample(image: Image) -> None:
+def resample(
+    image: Image,
+    *,
+    x_max: float = 2.0,
+    y_max: float = 0.8,
+    step_x: float = 1e-3,
+    step_y: float  = 1e-3
+) -> None:
+    # TODO: To some error checking here
     x_axis, y_axis = image.axis
     scale = image.scale
     origin = x_axis ^ y_axis        # Intersection
 
     # subtrcting from 'c' moves along the line
-    a = x_axis ^ (y_axis - scale * image.resample_x_max)
-    b = (x_axis - image.scale * image.resample_y_max) ^ y_axis
+    a = x_axis ^ (y_axis - scale * x_max)
+    b = (x_axis - image.scale * y_max) ^ y_axis
 
-    n_x = int(image.resample_x_max / image.resample_step_x)
-    n_y = int(image.resample_y_max / image.resample_step_y)
+    n_x = int(x_max/step_x)
+    n_y = int(y_max/step_y)
 
     # Get the coordinates defining affine transform
     source_pts = np.array([origin, a, b], dtype="float32")

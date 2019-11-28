@@ -36,21 +36,20 @@ def rectangle_aspect_ratio(contour: np.ndarray) -> float:
     return min(dx, dy) / max(dx, dy)
 
 
-def match_square(contour, tol=0.2):
+def match_square(contour, aspect_ratio_tolerance: float = 0.2) -> np.ndarray:
     """Return True if contour is approximately bounded by a square."""
     x, y, w, h = cv2.boundingRect(contour)
-    if 1 - tol < w / h < 1 + tol:
+    if 1 - aspect_ratio_tolerance < w / h < 1 + aspect_ratio_tolerance:
         return True
     return False
 
 
-def contour_interior(contour: np.ndarray):
-    contour = contour.reshape(-1, 2)
+def contour_interior(contour: np.ndarray) -> np.ndarray:
+    contour = contour.reshape(-1, 2)    # copy the contour
     x0, y0 = pg.min(axis=0)
     x1, y1 = pg.max(axis=0)
 
     pg = shapely.geometry.Polygon(contour)
-
     pixels = indices_in_window(x0, y0, x1, y1)
     inside = [
         i for (i, pix) in enumerate(pixels) if pg.contains(shapely.geometry.Point(pix))
@@ -64,7 +63,8 @@ def match_contours(
     *,
     matcher: tp.Callable,
     contours: tp.Sequence[np.ndarray]
-) -> tp.List[tp.Any]:
+) -> tp.List[np.ndarray]:
+    """Filter the conturs by the supplied matching function."""
     matches = []
 
     for c in contours:
@@ -76,8 +76,17 @@ def match_contours(
         return matches
 
 
-def filter_contours(image: "Image", contours: tp.Sequence[np.ndarray]):
-    """Keep only the pixels inside the contours."""
+def filter_contours(
+    *,
+    image: Image,
+    contours: tp.Sequence[np.ndarray],
+    invert: bool = False
+) -> None:
+    """Keep only the pixels inside the contours.
+
+
+    `cv2.copyTo` assumes that the background is black, so set `invert` appropriately.
+    """
     if len(contours) == 0:
         assert False, "No contours"
 
@@ -85,11 +94,17 @@ def filter_contours(image: "Image", contours: tp.Sequence[np.ndarray]):
     image_filter = np.zeros(shape, dtype=image.image.dtype)
     image_filter = cv2.drawContours(image_filter, contours, -2, 255, cv2.FILLED)
 
-    _, binary_image = cv2.threshold(image.image, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
-    cv2.bitwise_and(image_filter, binary_image, dst=image.image)
+    if invert:
+        image.invert()
+    image.image = cv2.copyTo(image.image, mask=image_filter)
+    if invert:
+        image.invert()
+
+    # _, binary_image = cv2.threshold(image.image, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
+    # cv2.bitwise_and(image_filter, binary_image, dst=image.image)
 
 
-def remove_contours(image: "Image", contours: tp.Sequence[np.ndarray], fill_value: int = None):
+def remove_contours(image: Image, contours: tp.Sequence[np.ndarray], fill_value: int = None):
     """Remove the pixels inside the contours."""
     if len(contours) == 0:
         assert False, "No contours"
@@ -102,41 +117,21 @@ def remove_contours(image: "Image", contours: tp.Sequence[np.ndarray], fill_valu
     image.image = cv2.drawContours(image.image, contours, -2, int(_fill_value), cv2.FILLED)
 
 
-def filter_image(image: "Image", binary_mask: np.ndarray, fill_value: int = None):
+def filter_image(
+    *,
+    image: Image,
+    binary_mask: np.ndarray,
+    fill_value: int = None
+) -> None:
     _fill_value = fill_value
 
-    if binary_mask.dtype != bool or not np.in1d(np.unique(binary_mask), (0, 1)).all():
-        assert False, "Binary mask must be boolean or contain only {0 1}."""
+    if binary_mask.dtype != bool:
+        assert False, "Binary mask must be boolean."""
 
     if _fill_value is None:
         _fill_value = np.argmax(np.bincount(image.image.ravel()))
 
     image.image[binary_mask] = _fill_value
-
-
-def get_bounding_rectangle_matcher():
-
-    def matcher(contour):
-        x, y, w, h = list(map(int, cv2.boundingRect(contour)))
-        aspect_ratio = float(w)/h
-
-        area = cv2.contourArea(contour)
-        hull = cv2.convexHull(contour)
-
-        hull_area = cv2.contourArea(hull)
-        solidity = float(area)/hull_area
-
-        (x, y),(MA, ma), angle = cv2.fitEllipse(contour)
-
-        slash = 20 < angle < 40
-        horisontal = 80 < angle < 100 or aspect_ratio > 1
-        solid = solidity > 0.5
-
-        if solid and (horisontal or slash):
-            rectangle = cv2.minAreaRect(contour)
-            rectangle_contour = np.int0(cv2.boxPoints(rectangle))
-            return rectangle_contour
-    return matcher
 
 
 def get_contour_interior(contour: np.ndarray) -> np.ndarray:
@@ -154,7 +149,7 @@ def get_contour_interior(contour: np.ndarray) -> np.ndarray:
     return interior
 
 
-def get_contour_max_value(image: "Image", contour: np.ndarray) -> float:
+def get_contour_max_value(image: Image, contour: np.ndarray) -> float:
     I, J = get_contour_interior(contour).T
     max_value = image.image_orig[J, I].max()
     return max_value
@@ -166,7 +161,7 @@ def get_contour_mean_value(self, c: np.ndarray) -> float:
     return mean_value
 
 
-def image_to_point_cloud(image: "Image") -> np.ndarray:
+def image_to_point_cloud(image: Image) -> np.ndarray:
     """Return a scatterpolot of the image."""
     I, x = np.where(image.image)
     y = image.image.shape[0] - I - 1
@@ -174,7 +169,8 @@ def image_to_point_cloud(image: "Image") -> np.ndarray:
 
 
 def get_contours(
-    image: "Image",
+    *,
+    image: Image,
     min_size: int = 6,
     contour_mode: int = cv2.RETR_EXTERNAL,       # Retreive only the external contours
     contour_method: int = cv2.CHAIN_APPROX_TC89_L1      # Apply a flavor of the Teh Chin chain approx algo
@@ -183,7 +179,7 @@ def get_contours(
     """Find contours in a binary image."""
     contours = cv2.findContours(image.image, contour_mode, contour_method)
     contours = imutils.grab_contours(contours)
-    contours = list(filter(lambda c: c.size > min_size, contours))
+    contours = list(filter(lambda c: c.shape[0] > min_size, contours))
     return contours
 
 

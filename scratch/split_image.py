@@ -1,19 +1,23 @@
-from dgimage import Image, read_image, save_image
-from pathlib import Path
-from dgutils import match_contours, get_contours, get_marker_matcher
-import math
-
+import numpy as np
 import matplotlib.pyplot as plt
 
 import cv2
-import numpy as np
+import math
 
+from pathlib import Path
 
-def plot(image: np.ndarray):
-    fig, ax = plt.subplots(1)
-    ax.imshow(image, cmap="gray")
-    plt.show()
-    plt.close(fig)
+from dgimage import (
+    Image,
+    read_image,
+    save_image,
+)
+
+from dgutils import (
+    match_contours,
+    get_contours,
+    get_marker_matcher,
+    plot,
+)
 
 
 def markers(image: Image, kernel_length: int = 5):
@@ -37,8 +41,8 @@ def markers(image: Image, kernel_length: int = 5):
     # Compute intersection of horisontal and vertical
     cv2.bitwise_and(horisontal_image, vertical_image, dst=image.image)
 
-    contours = get_contours(image)
-    features = match_contours(matcher=get_marker_matcher(image), contours=contours)
+    contours = get_contours(image=image)
+    features = match_contours(matcher=get_marker_matcher(image=image), contours=contours)
 
     print("Num markers: ", len(features))
     image.reset_image()
@@ -87,11 +91,19 @@ def split_image(image):
     return new_image_list
 
 
-if __name__ == "__main__":
-    filepath = Path("../data/scan4.png")
-    # filepath = Path("../data/scan3_sample.png")
-
+def run(filepath: Path, identifier: str):
     image = read_image(filepath)
     image_list = split_image(image)
+
+    output_directory = Path(f"{identifier}_tmp_splits")
+    output_directory.mkdir(exist_ok=True)
+
     for i, image in enumerate(image_list):
-        save_image(Path("tmp_split_images") / f"split{i}.png", Image(image))
+        save_image(output_directory / f"split{i}_{identifier}.png", Image(image))
+
+
+if __name__ == "__main__":
+    filepath = Path("../data/scan4.png")
+    identifier = "scan4"
+    run(filepath, identifier)
+    # filepath = Path("../data/scan3_sample.png")

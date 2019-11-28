@@ -16,7 +16,7 @@ import matplotlib.pyplot as plt
 
 from .line import Line
 
-from .colors import colors
+from .colors import Colors
 
 from .image_utils import get_image_moment, color_to_grayscale, grayscale_to_color
 
@@ -25,11 +25,6 @@ from .image_utils import get_image_moment, color_to_grayscale, grayscale_to_colo
 class Image:
     image_orig: np.ndarray
     image: np.ndarray = None
-
-    resample_x_max = 2.0
-    resample_y_max = 0.8
-    resample_step_x = 1/1000
-    resample_step_y = 1/1000
 
     axis = None
     scale = None
@@ -108,16 +103,24 @@ class Image:
         self.image *= np.uint8(-1)
         self.image += np.uint8(max_value)
 
+    def equalize_hist(self) -> None:
+        cv2.equalizeHist(self.image, dst=self.image)
+
     def set_axis(self, axis: tp.Tuple[np.ndarray, np.ndarray]) -> None:
         self.axis = axis
 
     def set_scale(self, scale: float) -> None:
         self.scale = scale
 
-    def draw(self, features, draw_axis=True, show=True):
+    def draw(
+        self,
+        features: tp.Sequence[np.ndarray],
+        draw_axis: bool = True,
+        show: bool = True,
+        lw: int = 1
+    ) -> None:
         """Draw the image with overlaid contours."""
-        color_iterator = itertools.cycle(colors)
-        lw = 1
+        color_iterator = itertools.cycle(Colors)
 
         image_draw = self.copy_image()
         if len(image_draw.shape) < 3:
