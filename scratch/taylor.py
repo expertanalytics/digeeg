@@ -5,9 +5,6 @@ import scipy.interpolate as interp
 import matplotlib.pyplot as plt
 
 
-
-
-
 class PointAccumulator:
     def __init__(self, num_lines):
         self.num_lines = num_lines
@@ -20,13 +17,33 @@ class PointAccumulator:
 
         if len(self.x_points) >= look_back:      # for cubic interpolation
             # Create the interpolators for each line
-            interpolators = [
-                interp.CubicSpline(
-                    self.x_points[-look_back:],
-                    values[-look_back:],
-                    extrapolate=True
-                ) for values in self.list_of_values
-            ]
+
+            interpolators = []
+            # fig, ax = plt.subplots(1)
+            for i, values in enumerate(self.list_of_values):
+                old_x = self.x_points[-look_back:]
+                old_y = values[-look_back:]
+                interpolator = interp.interp1d(self.x_points[-look_back:], values[-look_back:], fill_value="extrapolate", kind="linear")
+                interpolators.append(interpolator)
+
+                # x = old_x + [x_val]
+                # y = old_y + [interpolator(x_val)]
+
+                # ax.plot(x, y)
+                # ax.plot(old_x, old_y, "o")
+                # for p in _point:
+                #     ax.plot(x_val, p, "x")
+                # ax.set_title(f"x_val: {x_val}")
+            # plt.show()
+            # plt.close(fig)
+
+            # interpolators = [
+            #     interp.interp1d(
+            #         self.x_points[-look_back:],
+            #         values[-look_back:],
+            #         fill_value="extrapolate"
+            #     ) for values in self.list_of_values
+            # ]
 
             approximation_array = np.zeros((len(interpolators), _point.size))
             for i, interpolator in enumerate(interpolators):
@@ -37,24 +54,45 @@ class PointAccumulator:
             np.sqrt(dists, out=dists)
 
             added = []      # for debug purposes
-            for i, p in enumerate(_point):
-                j = np.min(np.argmin(dists, axis=1))
+            for _ in range(self.num_lines):
+                min_idx = np.argmin(dists)
+                i = min_idx // dists.shape[1]
+                j = min_idx % dists.shape[1]
+
+                dists[i, :] = 1e9
                 dists[:, j] = 1e9
-                self.list_of_values[j].append(p)
-                if j in added:
-                    from IPython import embed; embed()
-                    assert False
+
+                self.list_of_values[i].append(_point[j])
                 added.append(j)
 
-            for i in filter(lambda x: x not in added, range(len(self.list_of_values))):
-                self.list_of_values[i].append(0)        # This is a sketchy guardian value
+            # fig, ax = plt.subplots(1)
+            # x = np.linspace(self.x_points[-look_back], x_val, 100)
+            # for i in range(self.num_lines):
+            #     ax.plot(x, interpolators[i](x), label=f"i = {i}")
+
+            # for j in range(self.num_lines):
+            #     ax.plot(self.x_points[-look_back:], self.list_of_values[j][-look_back:], "o")
+
+            # for p in _point:
+            #     ax.plot(x_val, p, "x")
+
+            # ax.set_title(x_val)
+
+            # # ax.legend()
+            # plt.show()
+
+            # for i in filter(lambda x: x not in added, range(len(self.list_of_values))):
+            #     self.list_of_values[i].append(0)        # This is a sketchy guardian value
 
             # Compare with np.asarray(point)
 
         else:
             for i in range(self.num_lines):
                 self.list_of_values[i].append(point[i])
+
         self.x_points.append(x_val)
+        new_points = [values[-1] for values in self.list_of_values]
+        return new_points
 
 
 def test1():
@@ -126,5 +164,6 @@ def test3():
 
 
 if __name__ == "__main__":
-    # test2(N=1000)
+    test1()
+    test2(N=1000)
     test3()
