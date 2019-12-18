@@ -4,6 +4,7 @@ import typing as tp
 
 import cv2
 import math
+import argparse
 
 from pathlib import Path
 
@@ -17,43 +18,27 @@ from dgimage import (
 )
 
 from dgutils import (
-    match_contours,
-    get_contours,
-    get_marker_matcher,
     plot,
+    markers
 )
 
 
-def markers(image: Image, kernel_length: int = 5):
-    """Return the contours of the black square markers."""
-    assert len(image.image.shape) == 2, f"Expecting binary image"
-    image.invert()
-    image.blur(9)
-    image.threshold(150)
-
-    vertical_kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (1, kernel_length))
-    horisontal_kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (kernel_length, 1))
-
-    # vertial lines
-    vertical_image = cv2.erode(image.image, vertical_kernel, iterations=4)
-    cv2.dilate(vertical_image, vertical_kernel, iterations=4, dst=vertical_image)
-
-    # Horisontal lines
-    horisontal_image = cv2.erode(image.image, horisontal_kernel, iterations=4)
-    cv2.dilate(image.image, horisontal_kernel, iterations=4, dst=vertical_image)
-
-    # Compute intersection of horisontal and vertical
-    cv2.bitwise_and(horisontal_image, vertical_image, dst=image.image)
-
-    contours = get_contours(image=image)
-    features = match_contours(matcher=get_marker_matcher(image=image), contours=contours)
-    image.reset_image()
-    return features
-
-
-def split_image(image):
+def split_image(
+    image: Image,
+    *,
+    kernel_length: int = 5,
+    blur_kernel_size: int = 9,
+    threshold_value: float = 150,
+    num_iterations: int = 4
+) -> tp.List[Image]:
     image.bgr_to_gray()
-    rectangles = markers(image)
+    rectangles = markers(
+        image,
+        kernel_length=kernel_length,
+        blur_kernel_size=blur_kernel_size,
+        threshold_value=threshold_value,
+        num_iterations=num_iterations,
+    )
 
     rectangle_array = np.zeros((len(rectangles), 4, 2))
     for i, rec in enumerate(rectangles):
@@ -94,36 +79,63 @@ def split_image(image):
     return new_image_list
 
 
-def run(input_image_path: Path, output_directory: Path, identifier: str):
+def run(
+    input_image_path: Path,
+    output_directory: Path,
+    name: str,
+    *,
+    debug: bool = False,
+    compute_scale: bool = True,
+    kernel_length: int = 9,
+    num_iterations: int = 4,
+    blur_size: int = 9,
+    thresh_val: float = 150,
+    dx: float = 2.5e-4,
+    dy: float = 2.5e-4
+):
     image = read_image(input_image_path)
     image_list = split_image(image)
 
     scale_dict = {}
     for i, image in enumerate(image_list):
         image.bgr_to_gray()
-        features = markers(image)
+        rectangles = markers(
+            image,
+            kernel_length=kernel_length,
+            blur_kernel_size=blur_size,
+            threshold_value=thresh_val,
+            num_iterations=num_iterations,
+            debug=debug
+        )
 
-        axis, scale = get_axis(image, features)
+        axis, scale = get_axis(image, rectangles)
         image.set_axis(axis)
         image.set_scale(scale)
         old_scale = scale
         image.reset_image()
-        resample(image, step_x=2.5e-4, step_y=2.5e-4)
+        resample(image, step_x=dx, step_y=dy)
         image.checkpoint()
 
-        # Recompute scale
-        image.bgr_to_gray()
-        features = markers(image)       # 
-        axis, scale = get_axis(image, features)
-        image.set_axis(axis)
-        image.set_scale(scale)
-        scale_dict[i] = scale
+        if compute_scale:    # Recompute scale
+            image.bgr_to_gray()
+            rectangles = markers(
+                image,
+                kernel_length=kernel_length,
+                blur_kernel_size=blur_size,
+                threshold_value=thresh_val,
+                num_iterations=num_iterations,
+                debug=debug
+            )
+            axis, scale = get_axis(image, rectangles)
+            image.set_axis(axis)
+            image.set_scale(scale)
+            scale_dict[i] = scale
 
     output_directory.mkdir(exist_ok=True, parents=True)
 
     for i, image in enumerate(image_list):
         print("Scale: ", image.scale)
-        save_image(output_directory / f"{identifier}_split{i}.png", image)
+        save_image(output_directory / f"{name}_split{i}.png", image)
         # dump_image(output_directory / f"split{i}_{identifier}.pkl", image)
 
     with open(output_directory / "scales.txt", "a") as output_handle:
@@ -131,14 +143,104 @@ def run(input_image_path: Path, output_directory: Path, identifier: str):
             output_handle.write(f"Case: {case}, Scale: {scale}\n")
 
 
-if __name__ == "__main__":
-    import sys
-    input_image_path = Path(sys.argv[1])
-    output_directory = Path(sys.argv[2])
-    identifier = sys.argv[3]
-    run(input_image_path, output_directory, identifier)
+def create_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(
+        description="Split an paper strip based on the black squares"
+    )
+    parser.add_argument(
+        "-i",
+        "--input",
+        help="Path to original image",
+        type=Path,
+        required=True
+    )
 
-    # filepath = Path("../data/scan4.png")
-    # identifier = "scan4"
-    # run(filepath, identifier)
-    # filepath = Path("../data/scan3_sample.png")
+    parser.add_argument(
+        "-o",
+        "--odir",
+        help="utput directory",
+        type=Path,
+        required=True
+    )
+
+    parser.add_argument(
+        "-n",
+        "--name",
+        help="Base name of output files.",
+        required=True
+    )
+
+    parser.add_argument(
+        "--debug",
+        action="store_true",
+        help="Store intermediate images for calibration.",
+        required=False
+    )
+
+    parser.add_argument(
+        "--compute_scale",
+        action="store_true",
+        help="Compute the scaling based on feduciary markers.",
+        required=False
+    )
+
+    parser.add_argument(
+        "--kernel_length",
+        type=int,
+        default=5,
+        help="Length of morphological kernel for removing everything but square fiducairies.",
+    )
+
+    parser.add_argument(
+        "--num_iterations",
+        type=int,
+        default=4,
+        help="Number of iterations in open/close morphological transformations.",
+    )
+
+    parser.add_argument(
+        "--blur_size",
+        type=int,
+        default=9,
+        help="Blur kernel size. Used in conjunction with `threshold`.",
+    )
+
+    parser.add_argument(
+        "--thresh_val",
+        type=float,
+        default=150,
+        help="Apply thresholding to binarise image. Use '-1' for Otsu's binarisation.",
+    )
+
+    parser.add_argument(
+        "--dx",
+        type=float,
+        default=2.5e-4,
+        help="scaling of new x-axis. See `dgimage.resample` for more detail.",
+    )
+
+    parser.add_argument(
+        "--dy",
+        type=float,
+        default=2.5e-4,
+        help="Scaling of new y-axis. See `dgimage.resample` for more detail.",
+    )
+    return parser
+
+
+if __name__ == "__main__":
+    parser = create_parser()
+    cmd_args = parser.parse_args()
+
+    args = (cmd_args.input, cmd_args.odir, cmd_args.name)
+    kwargs = {
+        "debug": cmd_args.debug,
+        "compute_scale": cmd_args.compute_scale,
+        "kernel_length": cmd_args.kernel_length,
+        "num_iterations": cmd_args.num_iterations,
+        "blur_size": cmd_args.blur_size,
+        "thresh_val": cmd_args.thresh_val,
+        "dx": cmd_args.dx,
+        "dy": cmd_args.dy
+    }
+    run(*args, **kwargs)

@@ -1,8 +1,13 @@
 import numpy as np
-import cv2
-import shapely
 import typing as tp
+
+import cv2
+import time
+import shapely
 import imutils
+
+from pathlib import Path
+
 from dgimage import Image
 
 
@@ -194,3 +199,16 @@ def match_rectangle(c: np.ndarray, rectangle_approx_tol: float = 0.04):
         # Check angles for rectangle
         if max(abs(angles - np.pi/2)) < 0.1  * np.pi:       # 0.1
             return approx
+
+
+def save(image_array: np.ndarray, directory: Path, name: str) -> None:
+    directory.mkdir(exist_ok=True, parents=True)
+    cv2.imwrite(image_array, str(directory / name))
+
+
+def get_debug_path(identifier: str, *, mkdir: bool = True) -> Path:
+    debug_path = Path("debug") / f"{identifier}{str(int(time.time()))[:4]}"
+    if mkdir:
+        debug_path.mkdir(exist_ok=True, parents=True)
+    return debug_path
+

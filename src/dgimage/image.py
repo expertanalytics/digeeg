@@ -59,7 +59,7 @@ class Image:
     def gray_to_bgr(self) -> None:
         self.image = grayscale_to_color(self.image)
 
-    def threshold(self, thresh_val: float = None) -> None:
+    def threshold(self, thresh_val: float = -1) -> None:
         """Apply a fixed level threshold to each pixel.
 
         dst(x, y) = maxval if src(x, y) > thresh_val else 0
@@ -69,7 +69,7 @@ class Image:
 
         It is recommended to blur the image before binarisation.
         """
-        if thresh_val is None:
+        if thresh_val == -1:
             cv2.threshold(self.image, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU, dst=self.image)
         else:
             cv2.threshold(self.image, thresh_val, 255, cv2.THRESH_BINARY, dst=self.image)
@@ -159,7 +159,10 @@ class Image:
             cv2.destroyAllWindows()
         return image_draw
 
+
 def read_image(filepath: Path) -> Image:
+    if not filepath.exists():
+        raise FileNotFoundError(filepath)
     image_array = cv2.imread(str(filepath))
     return Image(image_array)
 
@@ -176,6 +179,8 @@ def dump_image(filepath: Path, image: Image):
 
 
 def load_image(filepath: Path) -> Image:
+    if not filepath.exists():
+        raise FileNotFoundError(filepath)
     with filepath.open("rb") as infile:
         return pickle.load(infile)
 
