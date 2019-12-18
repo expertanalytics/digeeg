@@ -11,7 +11,8 @@ VOLUME $HOME/shared
 RUN apt-get update && \
     apt-get -y upgrade && \
     apt-get -y install python3-pip git libsm6 libxrender1 && \
-    python3 -m pip install --upgrade pip
+    python3 -m pip install --upgrade pip && \
+    python3 -m pip install scipy opencv-python numpy shapely matplotlib imutils pylint
 
 RUN cd $HOME && git clone -b js git://github.com/expertanalytics/digeeg && cd digeeg && \
     python3 -m pip install -e .

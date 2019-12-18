@@ -78,9 +78,8 @@ def match_contours(
 
 def filter_contours(
     *,
-    image: Image,
-    contours: tp.Sequence[np.ndarray],
-    invert: bool = False
+    image_array: np.ndarray,
+    contours: tp.Sequence[np.ndarray]
 ) -> None:
     """Keep only the pixels inside the contours.
 
@@ -90,15 +89,14 @@ def filter_contours(
     if len(contours) == 0:
         assert False, "No contours"
 
-    shape = (m, n) = image.image.shape[:2]
-    image_filter = np.zeros(shape, dtype=image.image.dtype)
+    shape = (m, n) = image_array.shape[:2]
+    image_filter = np.zeros(shape, dtype=image_array.dtype)
     image_filter = cv2.drawContours(image_filter, contours, -2, 255, cv2.FILLED)
 
-    if invert:
-        image.invert()
-    image.image = cv2.copyTo(image.image, mask=image_filter)
-    if invert:
-        image.invert()
+    # image.image = cv2.copyTo(image, mask=image_filter)
+    foo = np.sum(image_array)
+    image_array[:] = cv2.copyTo(image_array, mask=image_filter)
+    assert np.sum(image_array) != foo
 
     # _, binary_image = cv2.threshold(image.image, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
     # cv2.bitwise_and(image_filter, binary_image, dst=image.image)
@@ -119,7 +117,7 @@ def remove_contours(image: Image, contours: tp.Sequence[np.ndarray], fill_value:
 
 def filter_image(
     *,
-    image: Image,
+    image_array: np.ndarray,
     binary_mask: np.ndarray,
     fill_value: int = None
 ) -> None:
@@ -129,9 +127,9 @@ def filter_image(
         assert False, "Binary mask must be boolean."""
 
     if _fill_value is None:
-        _fill_value = np.argmax(np.bincount(image.image.ravel()))
+        _fill_value = np.argmax(np.bincount(image_array.ravel()))
 
-    image.image[binary_mask] = _fill_value
+    image_array[binary_mask] = _fill_value
 
 
 def get_contour_interior(contour: np.ndarray) -> np.ndarray:

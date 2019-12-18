@@ -244,23 +244,22 @@ def extract_data(image):
     plt.show()
 
 
-def run(case):
-    filename = f"scan4_tmp_splits/split{case}_scan4.pkl"
-    image = load_image(Path(filename))
+def run(input_image_path: Path, output_directory: Path, identifier: str, scale: float = None):
+    image = read_image(input_image_path)
     features = prepare_lines(image)
 
     image.reset_image("resampled")
     image.invert()
 
-    outpath = Path(f"tmp_contours{case}")
-    outpath.mkdir(exist_ok=True)
+    output_directory.mkdir(exist_ok=True, parents=True)
 
     for i, c in enumerate(features):
         tmp_image = image.copy_image()
 
         filter_contours(image_array=tmp_image, contours=[c])
         clipped_contour = tmp_image[~np.all(tmp_image == 0, axis=1)]
-        np.save(outpath / f"image_contour{i}.npy", clipped_contour)
+        save_image(output_directory / f"{identifier}_trace{i}.png", Image(clipped_contour))
+        # np.save(outpath / f"image_contour{i}.npy", clipped_contour)
 
     ##################
     ### Make image ###
@@ -300,13 +299,22 @@ def run(case):
 
     ax.imshow(tmp_image)
     ax.set_title("A digitised paper strip")
-    ax.set_xticklabels(["{:.1f} cm".format(15*i/image.scale) for i in ax.get_xticks()])
-    ax.set_yticklabels(["{:.1f} cm".format(15*i/image.scale) for i in ax.get_yticks()])
+    if scale is not None:       # multiply by distance between black sqaures?
+        ax.set_xticklabels(["{:.1f} cm".format(15*i/scale) for i in ax.get_xticks()])
+        ax.set_yticklabels(["{:.1f} cm".format(15*i/scale) for i in ax.get_yticks()])
     ax.set_ylabel("Voltage")
     ax.set_xlabel("Time")
-    fig.savefig(f"contours{case}.png")
-    plt.show()
+    fig.savefig(output_directory / f"{identifier}_annotated.png")
+
 
 if __name__ == "__main__":
-    for case in range(5):
-        run(case)
+    import sys
+    input_image_path = Path(sys.argv[1])
+    output_directory = Path(sys.argv[2])
+    identifier = sys.argv[3]
+
+    scale = None
+    if len(sys.argv) > 4:
+        scale = float(sys.argv[4])
+
+    run(input_image_path, output_directory, identifier, scale)

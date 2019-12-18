@@ -1,4 +1,4 @@
-from .image import Image, read_image, save_image
+from .image import Image, read_image, save_image, dump_image, load_image
 from .resample import get_axis, resample
 
 from .colors import (

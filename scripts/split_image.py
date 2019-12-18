@@ -94,11 +94,12 @@ def split_image(image):
     return new_image_list
 
 
-def run(filepath: Path, identifier: str):
-    image = read_image(filepath)
+def run(input_image_path: Path, output_directory: Path, identifier: str):
+    image = read_image(input_image_path)
     image_list = split_image(image)
 
-    for image in image_list:
+    scale_dict = {}
+    for i, image in enumerate(image_list):
         image.bgr_to_gray()
         features = markers(image)
 
@@ -116,19 +117,28 @@ def run(filepath: Path, identifier: str):
         axis, scale = get_axis(image, features)
         image.set_axis(axis)
         image.set_scale(scale)
+        scale_dict[i] = scale
 
-    output_directory = Path(f"{identifier}_tmp_splits")
-    output_directory.mkdir(exist_ok=True)
+    output_directory.mkdir(exist_ok=True, parents=True)
 
     for i, image in enumerate(image_list):
-        print(image.image.shape)
-        print(image.scale)
-        save_image(output_directory / f"split{i}_{identifier}.png", image)
-        dump_image(output_directory / f"split{i}_{identifier}.pkl", image)
+        print("Scale: ", image.scale)
+        save_image(output_directory / f"{identifier}_split{i}.png", image)
+        # dump_image(output_directory / f"split{i}_{identifier}.pkl", image)
+
+    with open(output_directory / "scales.txt", "a") as output_handle:
+        for case, scale in scale_dict.items():
+            output_handle.write(f"Case: {case}, Scale: {scale}\n")
 
 
 if __name__ == "__main__":
-    filepath = Path("../data/scan4.png")
-    identifier = "scan4"
-    run(filepath, identifier)
+    import sys
+    input_image_path = Path(sys.argv[1])
+    output_directory = Path(sys.argv[2])
+    identifier = sys.argv[3]
+    run(input_image_path, output_directory, identifier)
+
+    # filepath = Path("../data/scan4.png")
+    # identifier = "scan4"
+    # run(filepath, identifier)
     # filepath = Path("../data/scan3_sample.png")

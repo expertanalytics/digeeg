@@ -3,6 +3,7 @@ from pathlib import Path
 import dataclasses
 import collections
 import itertools
+import pickle
 
 import operator
 
@@ -33,9 +34,12 @@ class Image:
         self.checkpoint_dict: tp.Dict[str, np.ndarray] = dict()
         self.reset_image()
 
-    def checkpoint(self, tag: str):
+    def checkpoint(self, tag: str = None):
         """Set image_orig to current image."""
-        self.checkpoint_dict[tag] = self.copy_image()
+        if tag is None:
+            self.image_orig = self.copy_image()
+        else:
+            self.checkpoint_dict[tag] = self.copy_image()
 
     def copy_image(self):
         """Return a copy of `self.image`."""
@@ -164,6 +168,16 @@ def save_image(filepath: Path, image: Image):
     success = cv2.imwrite(str(filepath.resolve()), image.image)
     if not success:
         raise IOError("Failed to save image")
+
+
+def dump_image(filepath: Path, image: Image):
+    with filepath.open("wb") as outpath:
+        pickle.dump(image, outpath)
+
+
+def load_image(filepath: Path) -> Image:
+    with filepath.open("rb") as infile:
+        return pickle.load(infile)
 
 
 if __name__ == "__main__":
