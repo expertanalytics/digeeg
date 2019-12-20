@@ -5,10 +5,15 @@ import cv2
 import time
 import shapely
 import imutils
+import logging
+
 
 from pathlib import Path
 
 from dgimage import Image
+
+
+log = logging.getLogger(__name__)
 
 
 def angles_in_contour(contour: np.ndarray) -> np.ndarray:
@@ -178,7 +183,6 @@ def get_contours(
     contour_mode: int = cv2.RETR_EXTERNAL,       # Retreive only the external contours
     contour_method: int = cv2.CHAIN_APPROX_TC89_L1      # Apply a flavor of the Teh Chin chain approx algo
 ) -> tp.List[np.ndarray]:
-
     """Find contours in a binary image."""
     contours = cv2.findContours(image.image, contour_mode, contour_method)
     contours = imutils.grab_contours(contours)
@@ -202,11 +206,14 @@ def match_rectangle(c: np.ndarray, rectangle_approx_tol: float = 0.04):
 
 
 def save(image_array: np.ndarray, directory: Path, name: str) -> None:
+    """Save `image_array` in `path` with name as a png."""
     directory.mkdir(exist_ok=True, parents=True)
-    cv2.imwrite(image_array, str(directory / name))
+    # TODO: Problems with png resolution
+    cv2.imwrite(image_array, str(directory / f"{name}.png"))
 
 
 def get_debug_path(identifier: str, *, mkdir: bool = True) -> Path:
+    """Return a 'unique' path from  identifier based on epoch."""
     debug_path = Path("debug") / f"{identifier}{str(int(time.time()))[:4]}"
     if mkdir:
         debug_path.mkdir(exist_ok=True, parents=True)

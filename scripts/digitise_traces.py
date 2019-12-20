@@ -3,11 +3,17 @@ import typing as tp
 import matplotlib.pyplot as plt
 import scipy.signal as signal
 
+import os
+import logging
+
 from pathlib import Path
 
 from dgimage import read_image
 
 from taylor import PointAccumulator
+
+
+logging.basicConfig(level=os.environ.get("LOGLEVEL", "INFO"))
 
 
 def find_datapoints(

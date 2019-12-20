@@ -3,6 +3,7 @@ import typing as tp
 
 import cv2
 import shapely.geometry
+import logging
 
 from .utils import (
     match_rectangle,
@@ -12,6 +13,9 @@ from .utils import (
 )
 
 from dgimage import Image
+
+
+log = logging.getLogger(__name__)
 
 
 def get_marker_matcher(

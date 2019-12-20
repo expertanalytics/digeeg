@@ -2,6 +2,12 @@ import matplotlib.pyplot as plt
 import numpy as np
 from pathlib import Path
 
+import logging
+import os
+
+
+logging.basicConfig(level=os.environ.get("LOGLEVEL", "INFO"))
+
 
 def run(input_array):
     fig, ax = plt.subplots(1)

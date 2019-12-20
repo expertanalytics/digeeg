@@ -5,6 +5,8 @@ import typing as tp
 import cv2
 import math
 import argparse
+import logging
+import os
 
 from pathlib import Path
 
@@ -14,13 +16,18 @@ from dgimage import (
     save_image,
     resample,
     get_axis,
-    dump_image
+    dump_image,
 )
 
 from dgutils import (
     plot,
-    markers
+    markers,
+    save,
+    get_debug_path,
 )
+
+
+logging.basicConfig(level=os.environ.get("LOGLEVEL", "INFO"))
 
 
 def split_image(
@@ -93,12 +100,18 @@ def run(
     dx: float = 2.5e-4,
     dy: float = 2.5e-4
 ):
+
     image = read_image(input_image_path)
     image_list = split_image(image)
+
+    if debug:
+        debug_path = get_debug_path("split_image")
+        save(np.ndarray, debug_path, "input")
 
     scale_dict = {}
     for i, image in enumerate(image_list):
         image.bgr_to_gray()
+        # TODO: debug each split
         rectangles = markers(
             image,
             kernel_length=kernel_length,

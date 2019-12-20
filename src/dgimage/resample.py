@@ -2,12 +2,15 @@ import numpy as np
 import typing as tp
 
 import dataclasses
-
 import cv2
+import logging
 
 from .line import Line
 from .image import Image
 from .image_utils import get_image_moment
+
+
+logger = logging.getLogger(__name__)
 
 
 def get_axis(image: Image, rectangles: tp.List[np.ndarray]):

@@ -1,11 +1,15 @@
 from enum import Enum
 import numpy as np
 
+import logging
+
 import matplotlib.colors as mcolors
 
 
-class Colors(Enum):
+logger = logging.getLogger(__name__)
 
+
+class Colors(Enum):
     RED = (0, 0, 255)
     YELLOW = (0, 255, 255)
     LIME = (0, 255, 0)

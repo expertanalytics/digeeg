@@ -9,6 +9,8 @@ from shapely.geometry import Polygon
 import cv2
 import math
 import itertools
+import os
+import logging
 
 from pathlib import Path
 
@@ -45,6 +47,9 @@ from dgimage import (
 )
 
 from dgutils import remove_structured_background
+
+
+logging.basicConfig(level=os.environ.get("LOGLEVEL", "INFO"))
 
 
 def remove_background(

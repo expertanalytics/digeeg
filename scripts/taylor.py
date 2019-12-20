@@ -1,8 +1,13 @@
 import numpy as np
 import typing as tp
 import scipy.interpolate as interp
-
 import matplotlib.pyplot as plt
+
+import logging
+import os
+
+
+logging.basicConfig(level=os.environ.get("LOGLEVEL", "INFO"))
 
 
 class PointAccumulator:

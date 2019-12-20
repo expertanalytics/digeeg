@@ -2,6 +2,10 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 import cv2
+import logging
+
+
+log = logging.getLogger(__name__)
 
 
 def show(image_array: np.ndarray, mode: int = None):

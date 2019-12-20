@@ -1,6 +1,11 @@
 import numpy as np
 import typing as tp
+
 import cv2
+import logging
+
+
+logger = logging.getLogger(__name__)
 
 
 def get_image_moment(image: np.ndarray, order: int = 1) -> tp.Tuple[float, float]:

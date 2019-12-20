@@ -1,5 +1,11 @@
-from dataclasses import dataclass, astuple
 import numpy as np
+
+import logging
+
+from dataclasses import dataclass, astuple
+
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass

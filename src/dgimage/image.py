@@ -4,8 +4,7 @@ import dataclasses
 import collections
 import itertools
 import pickle
-
-import operator
+import logging
 
 import cv2
 import imutils
@@ -20,6 +19,9 @@ from .line import Line
 from .colors import Colors
 
 from .image_utils import get_image_moment, color_to_grayscale, grayscale_to_color
+
+
+logger = logging.getLogger(__name__)
 
 
 @dataclasses.dataclass

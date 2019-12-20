@@ -3,6 +3,7 @@ import typing as tp
 
 import cv2
 import time
+import logging
 
 from pathlib import Path
 
@@ -15,6 +16,9 @@ from dgutils import (
     save,
     get_debug_path,
 )
+
+
+log = logging.getLogger(__name__)
 
 
 def remove_structured_background(
