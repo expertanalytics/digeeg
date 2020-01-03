@@ -22,7 +22,7 @@ def run(input_file: Path) -> None:
 
 
 def create_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser()
+    parser = argparse.ArgumentParser(description="Plot a line")
     parser.add_argument(
         "-i",
         "--input",

@@ -131,7 +131,7 @@ def run(
 
 
 def create_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser()
+    parser = argparse.ArgumentParser(description="Reduce a segmented trace to a line")
     parser.add_argument(
         "-i",
         "--input",

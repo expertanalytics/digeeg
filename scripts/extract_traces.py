@@ -6,6 +6,7 @@ from scipy import signal
 
 from shapely.geometry import Polygon
 
+import argparse
 import cv2
 import math
 import itertools
@@ -165,24 +166,6 @@ def extract_contours(
     return features
 
 
-def prepare_lines(image):
-    if debug:
-        debug_path = get_debug_path("prepare_lines")
-        save(np.ndarray, debug_path, "input")
-
-    image.bgr_to_gray()
-    image.checkpoint("resampled")
-
-    # TODO: I can move remove_background in here
-    remove_background(image=image, smooth_kernel_size=3)
-    features = extract_contours(image=image, blur_kernel_size=3)
-    if debug:
-        save(np.ndarray, debug_path, "remove_background")
-
-    image.invert()
-    return features
-
-
 def plot_line(image, index, convolve = False):
     fig, (ax1, ax2) = plt.subplots(2)
     ax1.imshow(image.image, cmap="gray")
@@ -200,66 +183,18 @@ def plot_line(image, index, convolve = False):
     plt.close(fig)
 
 
-def find_datapoints(image, start=8100):
-    image.invert()
-    _image = image.image
-    window = signal.hann(25)
-    window_sum = window.sum()
-
-    x = np.linspace(0, 1, _image.shape[0])
-    for i in range(start, _image.shape[1]):
-        raw_signal = _image[:, i]
-        filtered_signal = signal.fftconvolve(raw_signal, window, mode='same')/window_sum
-
-        tmp_peaks = signal.find_peaks(filtered_signal, prominence=10)[0]
-        peaks = sorted(tmp_peaks, key=lambda x: filtered_signal[x], reverse=True)[:4]
-
-        yield i, filtered_signal[peaks]
-
-        # TODO: How can I plot this in a sensible manner? Require docker with X-forwarding?
-        # fig, (ax1, ax2) = plt.subplots(2)
-        # ax2.imshow(_image, cmap="gray")
-        # ax2.axvline(i)
-
-        # ax1.plot(x, raw_signal)
-        # ax1.plot(x, filtered_signal, "--")
-        # ax1.plot(x[peaks], filtered_signal[peaks], "x")
-        # plt.show()
-        # plt.close(fig)
-        return
-
-
-def extract_data(image):
-    print(image.image.shape)
-
-    times = []
-    data_list = []
-    for t, data in find_datapoints(image, start=100):
-        if data.size == 4:
-            times.append(t)
-            data_list.append(list(data))
-        else:
-            data_list.append(np.zeros(4))
-
-    import operator
-
-    data_arrays = [np.fromiter(map(operator.itemgetter(i), data_list), dtype=np.float_) for i in range(4)]
-
-    fig, (ax1, ax2) = plt.subplots(2)
-
-    ax1.imshow(image.image, cmap="gray")
-    for i in range(4):
-        ax2.plot(data_arrays[i] + i*500, label=f"i = {i}")
-    ax2.legend()
-    plt.show()
-
-
 def run(
+    *,
     input_image_path: Path,
     output_directory: Path,
     identifier: str,
+    smooth_kernel_size: int = 3,
+    threshold_value: int = 100,
+    background_kernel_size=5,
+    dilate_kernel_size: int = 3,
+    num_dilate_iterations: int = 3,
     scale: float = None,
-    debug:bool
+    debug: bool = False
 ):
     """Remove the background, segment the contours and save the segmented lines as pngs."""
     image = read_image(input_image_path)
@@ -270,8 +205,21 @@ def run(
     image.bgr_to_gray()
     image.checkpoint("resampled")
 
-    remove_background(image=image, smooth_kernel_size=3)
-    features = extract_contours(image=image, blur_kernel_size=3)
+    remove_background(
+        image=image,
+        smooth_kernel_size=smooth_kernel_size,
+        threshold_value=threshold_value,
+        background_kernel_size=background_kernel_size,
+        debug=debug
+    )
+
+    features = extract_contours(
+        image=image,
+        blur_kernel_size=smooth_kernel_size,
+        dilate_kernel_size=dilate_kernel_size,
+        num_dilate_iterations=num_dilate_iterations,
+        debug=debug
+    )
     if debug:
         save(np.ndarray, debug_path, "remove_background")
     image.invert()
@@ -332,14 +280,103 @@ def run(
     fig.savefig(output_directory / f"{identifier}_annotated.png")
 
 
+def create_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(description="Segment EEG traces")
+    parser.add_argument(
+        "-i",
+        "--input",
+        help="Path to input image",
+        type=Path,
+        required=True
+    )
+
+    parser.add_argument(
+        "-o",
+        "--output",
+        help="Path to output directory",
+        type=Path,
+        required=True
+    )
+
+    parser.add_argument(
+        "-n",
+        "--name",
+        help="Identifier of the segmented trace",
+        type=str,
+        required=True
+    )
+
+    parser.add_argument(
+        "--smooth_kernel_size",
+        help="The size of the blur/smooth kernel",
+        default=3,
+        type=int,
+        required=False
+    )
+
+    parser.add_argument(
+        "--threshold_value",
+        help="The threshold value used for binarisation in conjunction with smoothing",
+        default=100,
+        type=int,
+        required=False
+    )
+
+    parser.add_argument(
+        "--background_kernel_size",
+        help="The size of the kernel for the morphological operations used to remove the background",
+        default=5,
+        type=int,
+        required=False
+    )
+
+    parser.add_argument(
+        "--dilate_kernel_size",
+        help="Kernel size for enlarging elements before filtering",
+        default=3,
+        type=int,
+        required=False
+    )
+
+    parser.add_argument(
+        "--num_dilate_iterations",
+        help="Number of times the dilate operation is applied",
+        default=3,
+        type=int,
+        required=False
+    )
+
+    parser.add_argument(
+        "--scale",
+        help="The scale of the image. What is the phusical size of a pixel.",
+        default=None,
+        type=int,
+        required=False
+    )
+
+    parser.add_argument(
+        "--debug",
+        action="store_true",
+        help="Store intermediate images for calibration.",
+        required=False
+    )
+
+    return parser
+
+
 if __name__ == "__main__":
-    import sys
-    input_image_path = Path(sys.argv[1])
-    output_directory = Path(sys.argv[2])
-    identifier = sys.argv[3]
+    parser = create_parser()
+    args = parser.parse_args()
 
-    scale = None
-    if len(sys.argv) > 4:
-        scale = float(sys.argv[4])
-
-    run(input_image_path, output_directory, identifier, scale)
+    run(
+        input_image_path=args.input,
+        output_directory=args.output,
+        identifier=args.name,
+        smooth_kernel_size=args.smooth_kernel_size,
+        threshold_value=args.threshold_value,
+        background_kernel_size=args.background_kernel_size,
+        dilate_kernel_size=args.dilate_kernel_size,
+        num_dilate_iterations=args.num_dilate_iterations,
+        scale=args.scale,
+        debug=args.debug
+    )
