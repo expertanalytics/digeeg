@@ -79,7 +79,6 @@ def markers(
     debug: bool = False
 ) -> tp.List[np.ndarray]:
     """Return the contours of the black square markers."""
-
     if debug:
         debug_path = get_debug_path("markers")
         save(np.ndarray, debug_path, "input")
