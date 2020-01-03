@@ -34,7 +34,9 @@ from dgutils import (
     get_marker_matcher,
     get_graph_matcher,
     show,
-    plot
+    plot,
+    save,
+    get_debug_path,
 )
 
 from dgimage import (
@@ -58,7 +60,13 @@ def remove_background(
     smooth_kernel_size: int = 2,
     threshold_value: int = 100,
     background_kernel_size: int = 5,
+    debug: bool = False
 ) -> None:
+    """Remove the background milimeter pattern."""
+    if debug:
+        debug_path = get_debug_path("remove_background")
+        save(np.ndarray, debug_path, "input")
+
     image.invert()              # We want the main features to be white
     image.blur(smooth_kernel_size)
     image.threshold(threshold_value)        # Removes most of the milimiter markers
@@ -66,39 +74,14 @@ def remove_background(
     remove_structured_background(
         image_array=image.image,
         background_kernel_size=(background_kernel_size, background_kernel_size),
-        smoothing_kernel_size=(smooth_kernel_size, smooth_kernel_size)
+        smoothing_kernel_size=(smooth_kernel_size, smooth_kernel_size),
+        debug=debug
     )
+    if debug:
+        save(np.ndarray, debug_path, "output")
 
     image.invert()
     image.checkpoint("preprocessed")
-
-
-def markers(image: Image, blur_kernel_size=9, kernel_length=5):
-    image.bgr_to_gray()
-    image.invert()
-    image.blur(blur_kernel_size)
-    image.threshold(150)
-
-    vertical_kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (1, kernel_length))
-    horisontal_kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (kernel_length, 1))
-
-    # vertial lines
-    vertical_image = cv2.erode(image.image, vertical_kernel, iterations=4)
-    cv2.dilate(vertical_image, vertical_kernel, iterations=4, dst=vertical_image)
-
-    # Horisontal lines
-    horisontal_image = cv2.erode(image.image, horisontal_kernel, iterations=4)
-    cv2.dilate(image.image, horisontal_kernel, iterations=4, dst=vertical_image)
-
-    # Compute intersection of horisontal and vertical
-    cv2.bitwise_and(horisontal_image, vertical_image, dst=image.image)
-
-    contours = get_contours(image=image)
-    features = match_contours(matcher=get_marker_matcher(image=image), contours=contours)
-
-    axis, scale = get_axis(image, features)
-    image.set_axis(axis)
-    image.set_scale(scale)
 
 
 def extract_contours(
@@ -106,20 +89,35 @@ def extract_contours(
     image: Image,
     blur_kernel_size: int = 3,
     dilate_kernel_size: int = 3,
-    num_dilate_iterations: int= 3
-) -> tp.Sequence[np.ndarray]:
+    num_dilate_iterations: int= 3,
+    debug: bool = True
+) -> tp.List[np.ndarray]:
+    """Segment the EEG traces.
+
+    Use a series of convolutions, filtering and edge tracking to extract the contours.
+
+    blur_kernel_size:
+        Used in conjunction with thresholding to binarise the image.
+    dilate_kernel_size:
+        Dilation is used with filtering to be aggressive in removing elements.
+    num_dilate_iterations:
+        THe number of dilate iterations.
+    """
+    if debug:
+        debug_path = get_debug_path("extract_contours")
+        save(np.ndarray, debug_path, "input")
     # Remove initial guess at contours. This should leave the text blocks.
     image.invert()
     contours = get_contours(image=image)
     features = match_contours(matcher=get_graph_matcher(approximation_tolerance=1e-2), contours=contours)
-
     remove_contours(image, features)
+    if debug:
+        save(np.ndarray, debug_path, "remove_contours")
 
     # Remove all the remaining text blobs
     image.blur(blur_kernel_size)
     image.threshold(100)
     image.morph(cv2.MORPH_DILATE, (dilate_kernel_size, dilate_kernel_size), num_dilate_iterations)
-
     contours = get_contours(image=image, min_size=6)
 
     # Compute all the bounding boxes and filter based on the aspect ratio?
@@ -127,7 +125,6 @@ def extract_contours(
         matcher=get_bounding_rectangle_matcher(min_solidity=0.7),
         contours=contours
     )
-
     filter_contours(image_array=image.image, contours=features)
     image.morph(cv2.MORPH_DILATE, (dilate_kernel_size, dilate_kernel_size), num_dilate_iterations)
     image_mask = image.copy_image()
@@ -135,6 +132,8 @@ def extract_contours(
     image.reset_image("preprocessed")
     filter_image(image_array=image.image, binary_mask=image_mask == 255)
     image.checkpoint("preprocessed")
+    if debug:
+        save(np.ndarray, debug_path, "filter_contours1")
 
     # Match the remaining graph candidates, and remove everything else
     image.invert()
@@ -145,13 +144,17 @@ def extract_contours(
     contours = get_contours(image=image)
     features = match_contours(matcher=get_graph_matcher(), contours=contours)
     filter_contours(image_array=image.image, contours=features)
+    if debug:
+        save(np.ndarray, debug_path, "filter_contours2")
 
     image.reset_image("resampled")
 
-    # TODO: Why invert?
+    # TODO: Why invert? Has something to do with the fill color in filter_contours
     image.invert()
     filter_contours(image_array=image.image, contours=features)
     image.invert()
+    if debug:
+        save(np.ndarray, debug_path, "filter_contours3")
 
     image.blur(blur_kernel_size)
     image.threshold(100)
@@ -163,19 +166,20 @@ def extract_contours(
 
 
 def prepare_lines(image):
-    # Reorient the image to align with axis
-    # markers(image)
-    # image.reset_image()
-    # resample(image, step_x=2.5e-4, step_y=2.5e-4)
+    if debug:
+        debug_path = get_debug_path("prepare_lines")
+        save(np.ndarray, debug_path, "input")
 
     image.bgr_to_gray()
     image.checkpoint("resampled")
 
+    # TODO: I can move remove_background in here
     remove_background(image=image, smooth_kernel_size=3)
     features = extract_contours(image=image, blur_kernel_size=3)
+    if debug:
+        save(np.ndarray, debug_path, "remove_background")
 
     image.invert()
-    foo = image.draw(features, show=False, lw=3)
     return features
 
 
@@ -211,16 +215,17 @@ def find_datapoints(image, start=8100):
         peaks = sorted(tmp_peaks, key=lambda x: filtered_signal[x], reverse=True)[:4]
 
         yield i, filtered_signal[peaks]
-        fig, (ax1, ax2) = plt.subplots(2)
 
-        ax2.imshow(_image, cmap="gray")
-        ax2.axvline(i)
+        # TODO: How can I plot this in a sensible manner? Require docker with X-forwarding?
+        # fig, (ax1, ax2) = plt.subplots(2)
+        # ax2.imshow(_image, cmap="gray")
+        # ax2.axvline(i)
 
-        ax1.plot(x, raw_signal)
-        ax1.plot(x, filtered_signal, "--")
-        ax1.plot(x[peaks], filtered_signal[peaks], "x")
-        plt.show()
-        plt.close(fig)
+        # ax1.plot(x, raw_signal)
+        # ax1.plot(x, filtered_signal, "--")
+        # ax1.plot(x[peaks], filtered_signal[peaks], "x")
+        # plt.show()
+        # plt.close(fig)
         return
 
 
@@ -249,9 +254,28 @@ def extract_data(image):
     plt.show()
 
 
-def run(input_image_path: Path, output_directory: Path, identifier: str, scale: float = None):
+def run(
+    input_image_path: Path,
+    output_directory: Path,
+    identifier: str,
+    scale: float = None,
+    debug:bool
+):
+    """Remove the background, segment the contours and save the segmented lines as pngs."""
     image = read_image(input_image_path)
-    features = prepare_lines(image)
+    if debug:
+        debug_path = get_debug_path("prepare_lines")
+        save(np.ndarray, debug_path, "input")
+
+    image.bgr_to_gray()
+    image.checkpoint("resampled")
+
+    remove_background(image=image, smooth_kernel_size=3)
+    features = extract_contours(image=image, blur_kernel_size=3)
+    if debug:
+        save(np.ndarray, debug_path, "remove_background")
+    image.invert()
+
 
     image.reset_image("resampled")
     image.invert()
@@ -260,11 +284,9 @@ def run(input_image_path: Path, output_directory: Path, identifier: str, scale: 
 
     for i, c in enumerate(features):
         tmp_image = image.copy_image()
-
         filter_contours(image_array=tmp_image, contours=[c])
         clipped_contour = tmp_image[~np.all(tmp_image == 0, axis=1)]
         save_image(output_directory / f"{identifier}_trace{i}.png", Image(clipped_contour))
-        # np.save(outpath / f"image_contour{i}.npy", clipped_contour)
 
     ##################
     ### Make image ###
@@ -286,21 +308,19 @@ def run(input_image_path: Path, output_directory: Path, identifier: str, scale: 
 
         tmp_image2 = np.zeros(tuple(map(math.ceil, (y1, x1))), dtype=np.uint8)
         tmp_image2 = cv2.drawContours(tmp_image2, features, i, 255, cv2.FILLED)
-        # np.save(f"tmp_contours/contour{i}.npy", tmp_image2)
 
-        if True:
-            ann = ax.annotate(
-                f"Contour {i}",
-                xy=(x0, y1),
-                xycoords="data",
-                xytext=(0, 35),
-                textcoords="offset points",
-                size=10,
-                bbox=dict(
-                    boxstyle="round",
-                    fc=color       # normalised color
-                )
+        ann = ax.annotate(
+            f"Contour {i}",
+            xy=(x0, y1),
+            xycoords="data",
+            xytext=(0, 35),
+            textcoords="offset points",
+            size=10,
+            bbox=dict(
+                boxstyle="round",
+                fc=color       # normalised color
             )
+        )
 
     ax.imshow(tmp_image)
     ax.set_title("A digitised paper strip")

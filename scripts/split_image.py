@@ -38,6 +38,20 @@ def split_image(
     threshold_value: float = 150,
     num_iterations: int = 4
 ) -> tp.List[Image]:
+    """Split an EEG scan into manageable parts.
+
+    Detect the black square fiduciary markers and split the scan into parts such that each
+    part contains two such markers.
+
+    kernel_length:
+        Govern how aggressive to be when removing horisontal and vertical background structures.
+    blur_kernel_size:
+        The size of the blur kernel for the initial blur then threshold operation.
+    threshold_value:
+        Thresholding is done right after the blurring.
+    num_iterations:
+        Number of iterations in the erode and dilate transformations.
+    """
     image.bgr_to_gray()
     rectangles = markers(
         image,
@@ -124,7 +138,6 @@ def run(
         axis, scale = get_axis(image, rectangles)
         image.set_axis(axis)
         image.set_scale(scale)
-        old_scale = scale
         image.reset_image()
         resample(image, step_x=dx, step_y=dy)
         image.checkpoint()

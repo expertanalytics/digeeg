@@ -47,10 +47,12 @@ def get_square_matcher(
     """Angle tolerance is in fractions of pi."""
 
     def matcher(contour: np.ndarray):
+        """
+        create a closed polygonal approximation to `c` with the distance between them
+        less than `epsilon*perimeter`.
+        """
         perimeter = cv2.arcLength(contour, True)
 
-        # create a closed polygonal approximation to `c` with the distance between them
-        # less than `epsilon*perimeter`.
         approx = cv2.approxPolyDP(contour, approx_tolerance*perimeter, True)
         if len(approx) == 4:
             angles = angles_in_contour(approx)
