@@ -9,13 +9,15 @@ from pathlib import Path
 
 from dgimage import Image
 
-from dgutils import (
+from .utils import (
     get_contours,
     match_contours,
-    get_marker_matcher,
     save,
-    get_debug_path,
 )
+
+from .matchers import get_marker_matcher
+
+from .debug import get_debug_path
 
 
 log = logging.getLogger(__name__)
@@ -34,7 +36,7 @@ def remove_structured_background(
     """
     if debug:
         debug_path = get_debug_path("markers")
-        save(np.ndarray, debug_path, "input")
+        save(image_array, debug_path, "input")
 
     structuring_element = cv2.getStructuringElement(
         cv2.MORPH_RECT,
@@ -66,7 +68,7 @@ def remove_structured_background(
     image_array[:] = cv2.copyTo(smooth, image_array)       # I think this is right
     if debug:
         debug_path = get_debug_path("remove_structured_background")
-        save(np.ndarray, debug_path, "output")
+        save(image_array, debug_path, "output")
 
 
 def markers(
@@ -79,9 +81,15 @@ def markers(
     debug: bool = False
 ) -> tp.List[np.ndarray]:
     """Return the contours of the black square markers."""
+
+    # from .plots import plot
+    # plot(image.image)
+    # cv2.imwrite("foo.png", image.image)
+    # assert False, image.image.dtype
+
     if debug:
         debug_path = get_debug_path("markers")
-        save(np.ndarray, debug_path, "input")
+        save(image.image, debug_path, "input")
 
     assert len(image.image.shape) == 2, f"Expecting binary image"
     image.invert()
@@ -89,7 +97,7 @@ def markers(
     image.threshold(threshold_value)
 
     if debug:
-        save(np.ndarray, debug_path, "threshold")
+        save(image.image, debug_path, "threshold")
 
     vertical_kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (1, kernel_length))
     horisontal_kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (kernel_length, 1))
@@ -106,7 +114,7 @@ def markers(
     cv2.bitwise_and(horisontal_image, vertical_image, dst=image.image)
 
     if debug:
-        save(np.ndarray, debug_path, "morphed")
+        save(image.image, debug_path, "morphed")
 
     contours = get_contours(image=image)
     features = match_contours(matcher=get_marker_matcher(image=image), contours=contours)

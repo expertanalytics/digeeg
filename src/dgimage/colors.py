@@ -30,11 +30,9 @@ class Colors(Enum):
     GRAY = (125, 125, 125)
     BLACK = (0, 0, 0)
 
-    @property
     def bgr(self):
         return self.value
 
-    @property
     def bgr_normal(self):
         return tuple(map(lambda x: x/255, self.value))
 

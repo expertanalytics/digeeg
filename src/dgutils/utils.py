@@ -208,14 +208,6 @@ def match_rectangle(c: np.ndarray, rectangle_approx_tol: float = 0.04):
 def save(image_array: np.ndarray, directory: Path, name: str) -> None:
     """Save `image_array` in `path` with name as a png."""
     directory.mkdir(exist_ok=True, parents=True)
+
     # TODO: Problems with png resolution
-    cv2.imwrite(image_array, str(directory / f"{name}.png"))
-
-
-def get_debug_path(identifier: str, *, mkdir: bool = True) -> Path:
-    """Return a 'unique' path from  identifier based on epoch."""
-    debug_path = Path("debug") / f"{identifier}{str(int(time.time()))[:4]}"
-    if mkdir:
-        debug_path.mkdir(exist_ok=True, parents=True)
-    return debug_path
-
+    cv2.imwrite(str(directory / f"{name}.png"), image_array)

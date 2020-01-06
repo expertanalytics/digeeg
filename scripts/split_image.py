@@ -30,6 +30,9 @@ from dgutils import (
 logging.basicConfig(level=os.environ.get("LOGLEVEL", "INFO"))
 
 
+logger = logging.getLogger(__name__)
+
+
 def split_image(
     image: Image,
     *,
@@ -114,13 +117,15 @@ def run(
     dx: float = 2.5e-4,
     dy: float = 2.5e-4
 ):
+    # if debug:
+    #     logging.basicConfig(level=logging.DEBUG)
 
     image = read_image(input_image_path)
     image_list = split_image(image)
 
     if debug:
         debug_path = get_debug_path("split_image")
-        save(np.ndarray, debug_path, "input")
+        save(image.image, debug_path, "input")
 
     scale_dict = {}
     for i, image in enumerate(image_list):

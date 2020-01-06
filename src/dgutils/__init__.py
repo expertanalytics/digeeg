@@ -14,7 +14,6 @@ from .utils import (
     get_contours,
     image_to_point_cloud,
     save,
-    gte_debug_path,
 )
 
 from .matchers import (
@@ -30,3 +29,8 @@ from .plots import (
 )
 
 from .processing_utils import remove_structured_background, markers
+
+from .debug import (
+    DEBUGCOUNTER,
+    get_debug_path,
+)
