@@ -11,7 +11,7 @@ from pathlib import Path
 
 from dgimage import read_image
 
-from taylor import PointAccumulator
+from dgutils import PointAccumulator
 
 
 logging.basicConfig(level=os.environ.get("LOGLEVEL", "INFO"))
@@ -75,9 +75,10 @@ def find_datapoints(
 def run(
     input_image_path: Path,
     output_directory: Path,
-    identfier: str,
+    identifier: str,
     start_column: int = 0,
-    show: bool = True
+    show: bool = False,
+    show_step: bool = False
 ):
     """Digitise *a single* eeg trace.
 
@@ -108,7 +109,7 @@ def run(
         image=trace_image,
         start_column=start_column,
         num_lines=0,
-        show=show
+        show=show_step
     ):
         y_list.append(new_y)
         x_list.append(i)
@@ -121,17 +122,20 @@ def run(
     y_arr *= -1                # flip
 
     # TODO: Save image for later review
-    _, (ax1, ax2) = plt.subplots(2)
+    fig, (ax1, ax2) = plt.subplots(2)
     ax1.imshow(new_image, cmap="gray")
     ax2.plot(x_arr, y_arr)
-    plt.show()
+    fig.savefig(output_directory / f"{identifier}_image.png")
+    if show:
+        plt.show()
+        plt.close(fig)
 
     out_array = np.zeros((x_arr.size, 2))
     out_array[:, 0] = x_arr
     out_array[:, 1] = y_arr
 
     output_directory.mkdir(exist_ok=True, parents=True)
-    np.save(output_directory / f"{identfier}_trace", out_array)
+    np.save(output_directory / f"{identifier}_trace", out_array)
 
 
 def create_parser() -> argparse.ArgumentParser:
@@ -170,23 +174,22 @@ def create_parser() -> argparse.ArgumentParser:
 
     parser.add_argument(
         "--show",
-        help="Display images for quality control",
+        help="Display image of final line for quality control",
         action="store_true",
-        required=False
+        required=False,
+    )
+
+    parser.add_argument(
+        "--show_step",
+        help="Display peak finding images for quality control",
+        action="store_true",
+        required=False,
     )
 
     return parser
 
 
 if __name__ == "__main__":
-    # contours = list(np.load("contours.npy", allow_pickle=True))
-    # take1(contours)
-    # take2(contours)
-    # import sys
-    # input_image_path = Path(sys.argv[1])
-    # output_directory = Path(sys.argv[2])
-    # identifier = sys.argv[3]
-
     parser = create_parser()
     args = parser.parse_args()
-    run(args.input, args.output, args.name, args.start, args.show)
+    run(args.input, args.output, args.name, args.start, args.show, args.show_step)
