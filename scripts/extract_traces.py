@@ -66,7 +66,7 @@ def remove_background(
     """Remove the background milimeter pattern."""
     if debug:
         debug_path = get_debug_path("remove_background")
-        save(np.ndarray, debug_path, "input")
+        save(image.image, debug_path, "input")
 
     image.invert()              # We want the main features to be white
     image.blur(smooth_kernel_size)
@@ -79,7 +79,7 @@ def remove_background(
         debug=debug
     )
     if debug:
-        save(np.ndarray, debug_path, "output")
+        save(image.image, debug_path, "output")
 
     image.invert()
     image.checkpoint("preprocessed")
@@ -106,14 +106,14 @@ def extract_contours(
     """
     if debug:
         debug_path = get_debug_path("extract_contours")
-        save(np.ndarray, debug_path, "input")
+        save(image.image, debug_path, "input")
     # Remove initial guess at contours. This should leave the text blocks.
     image.invert()
     contours = get_contours(image=image)
     features = match_contours(matcher=get_graph_matcher(approximation_tolerance=1e-2), contours=contours)
     remove_contours(image, features)
     if debug:
-        save(np.ndarray, debug_path, "remove_contours")
+        save(image.image, debug_path, "remove_contours")
 
     # Remove all the remaining text blobs
     image.blur(blur_kernel_size)
@@ -134,7 +134,7 @@ def extract_contours(
     filter_image(image_array=image.image, binary_mask=image_mask == 255)
     image.checkpoint("preprocessed")
     if debug:
-        save(np.ndarray, debug_path, "filter_contours1")
+        save(image.image, debug_path, "filter_contours1")
 
     # Match the remaining graph candidates, and remove everything else
     image.invert()
@@ -146,7 +146,7 @@ def extract_contours(
     features = match_contours(matcher=get_graph_matcher(), contours=contours)
     filter_contours(image_array=image.image, contours=features)
     if debug:
-        save(np.ndarray, debug_path, "filter_contours2")
+        save(image.image, debug_path, "filter_contours2")
 
     image.reset_image("resampled")
 
@@ -155,7 +155,7 @@ def extract_contours(
     filter_contours(image_array=image.image, contours=features)
     image.invert()
     if debug:
-        save(np.ndarray, debug_path, "filter_contours3")
+        save(image.image, debug_path, "filter_contours3")
 
     image.blur(blur_kernel_size)
     image.threshold(100)
@@ -200,7 +200,7 @@ def run(
     image = read_image(input_image_path)
     if debug:
         debug_path = get_debug_path("prepare_lines")
-        save(np.ndarray, debug_path, "input")
+        save(image.image, debug_path, "input")
 
     image.bgr_to_gray()
     image.checkpoint("resampled")
@@ -221,7 +221,7 @@ def run(
         debug=debug
     )
     if debug:
-        save(np.ndarray, debug_path, "remove_background")
+        save(image.image, debug_path, "remove_background")
     image.invert()
 
 

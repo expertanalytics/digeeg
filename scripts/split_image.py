@@ -117,9 +117,6 @@ def run(
     dx: float = 2.5e-4,
     dy: float = 2.5e-4
 ):
-    # if debug:
-    #     logging.basicConfig(level=logging.DEBUG)
-
     image = read_image(input_image_path)
     image_list = split_image(image)
 
