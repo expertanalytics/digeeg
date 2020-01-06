@@ -34,3 +34,5 @@ from .debug import (
     DEBUGCOUNTER,
     get_debug_path,
 )
+
+from .point_discriminator import PointAccumulator

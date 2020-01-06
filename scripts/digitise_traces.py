@@ -17,6 +17,9 @@ from taylor import PointAccumulator
 logging.basicConfig(level=os.environ.get("LOGLEVEL", "INFO"))
 
 
+logger = logging.getLogger(__name__)
+
+
 def find_datapoints(
     *,
     image: np.ndarray,
@@ -33,7 +36,7 @@ def find_datapoints(
     window1 = signal.gaussian(50, 15)       # TODO: Expose parameters
     window1_sum = window1.sum()
 
-    differentiator = PointAccumulator(num_lines=0)      # Restrict to a single line for now
+    differentiator = PointAccumulator(num_lines=1)      # Restrict to a single line for now
 
     for i in range(start_column, _image.shape[1]):
         raw_signal = _image[:, i]
@@ -51,6 +54,7 @@ def find_datapoints(
 
         # TODO: Check extrapolator
         new_points = differentiator.add_point(i, peaks, look_back=3)
+        logger.debug(new_points)
 
         # Probably want to move away from generator. Use differentiator always
         # TODO: Why move away from generator?
@@ -160,13 +164,14 @@ def create_parser() -> argparse.ArgumentParser:
         "--start",
         help="Start to digitise from `start`",
         type=int,
-        required=False
+        required=False,
+        default=0
     )
 
     parser.add_argument(
         "--show",
         help="Display images for quality control",
-        type=int,
+        action="store_true",
         required=False
     )
 

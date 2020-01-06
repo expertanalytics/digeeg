@@ -10,8 +10,12 @@ import os
 logging.basicConfig(level=os.environ.get("LOGLEVEL", "INFO"))
 
 
+logger = logging.getLogger(__name__)
+
+
 class PointAccumulator:
     def __init__(self, num_lines):
+        assert num_lines > 0, "`num_lines` must be greater than zero"
         self.num_lines = num_lines
         self.list_of_values: tp.List[tp.List[float]] = [list() for i in range(num_lines)]
 
