@@ -1,4 +1,5 @@
 import logging
+import sys
 
 from enum import Enum
 from pathlib import Path
@@ -23,7 +24,9 @@ DEBUGCOUNTER = DebugCounter()
 
 def get_debug_path(identifier: str, *, mkdir: bool = True) -> Path:
     """Return a 'unique' path from  identifier based on epoch."""
-    debug_path = Path("debug") / f"{identifier}{DEBUGCOUNTER.count}"
+    debug_base = Path(sys.argv[0]).stem
+    logging.debug(f"Using debug path: debug/{debug_base}")
+    debug_path = Path("debug") / debug_base / f"{identifier}{DEBUGCOUNTER.count}"
     logger.debug(debug_path)
     if mkdir:
         debug_path.mkdir(exist_ok=True, parents=True)

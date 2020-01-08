@@ -277,7 +277,7 @@ def run(
         ax.set_yticklabels(["{:.1f} cm".format(15*i/scale) for i in ax.get_yticks()])
     ax.set_ylabel("Voltage")
     ax.set_xlabel("Time")
-    fig.savefig(output_directory / f"{identifier}_annotated.png")
+    fig.savefig(output_directory / f"{identifier}_annotated.png", dpi=500)
 
 
 def create_parser() -> argparse.ArgumentParser:
