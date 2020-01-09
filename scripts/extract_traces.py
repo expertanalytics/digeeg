@@ -108,6 +108,7 @@ def extract_contours(
         debug_path = get_debug_path("extract_contours")
         save(image.image, debug_path, "input")
     # Remove initial guess at contours. This should leave the text blocks.
+    """
     image.invert()
     contours = get_contours(image=image)
     features = match_contours(matcher=get_graph_matcher(approximation_tolerance=1e-2), contours=contours)
@@ -159,6 +160,7 @@ def extract_contours(
 
     image.blur(blur_kernel_size)
     image.threshold(100)
+    """
 
     image.invert()
     contours = get_contours(image=image)
@@ -202,6 +204,11 @@ def run(
         debug_path = get_debug_path("prepare_lines")
         save(image.image, debug_path, "input")
 
+    mask1 = cv2.inRange(image.image, (90, 20, 20), (255, 100, 100))
+    mask2 = cv2.inRange(image.image, (20, 20, 90), (100, 100, 255))
+    mask = cv2.bitwise_or(mask1, mask2)
+    image.image[mask == 255] = 255
+
     image.bgr_to_gray()
     image.checkpoint("resampled")
 
@@ -243,7 +250,7 @@ def run(
     tmp_image = np.ones((*image.image.shape, 3), dtype=np.uint8)
     tmp_image[:] = (255, 255, 255)      # White
 
-    fig, ax = plt.subplots(1)
+    fig, ax = plt.subplots(1, figsize=(15, 10), dpi=500)
     ax.imshow(tmp_image)
 
     color_iterator = itertools.cycle(mtableau_brg())
