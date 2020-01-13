@@ -149,11 +149,11 @@ class Image:
             cv2.line(image_draw, pt0, pt1, color.bgr, lw)
 
             x0, y0 = get_image_moment(self.image, order=1)
-            cv2.circle(image_draw, (int(x0), int(y0)),  5, color.bgr)
-            cv2.circle(image_draw, (int(x0), int(y0)), 25, color.bgr)
+            cv2.circle(image_draw, (int(x0), int(y0)),  5, color.bgr())
+            cv2.circle(image_draw, (int(x0), int(y0)), 25, color.bgr())
 
         color = next(color_iterator)
-        image_draw = cv2.drawContours(image_draw, features, -2, color.bgr, lw)
+        image_draw = cv2.drawContours(image_draw, features, -2, color.bgr(), lw)
 
         if show:
             cv2.imshow("Image", image_draw)

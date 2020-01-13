@@ -21,6 +21,7 @@ setup(
         "console_scripts": [
             "split-image = scripts.split_image:main",
             "segment-traces = scripts.extract_traces:main",
+            "segment-traces-bw = scripts.extract_traces_bw:main",
             "digitise-traces = scripts.digitise_traces:main",
             "plot-trace = scripts.plot_array:main",
         ]
