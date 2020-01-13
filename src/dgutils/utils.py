@@ -1,9 +1,19 @@
 import numpy as np
-import cv2
-import shapely
 import typing as tp
+
+import cv2
+import time
+import shapely
 import imutils
+import logging
+
+
+from pathlib import Path
+
 from dgimage import Image
+
+
+log = logging.getLogger(__name__)
 
 
 def angles_in_contour(contour: np.ndarray) -> np.ndarray:
@@ -78,9 +88,8 @@ def match_contours(
 
 def filter_contours(
     *,
-    image: Image,
-    contours: tp.Sequence[np.ndarray],
-    invert: bool = False
+    image_array: np.ndarray,
+    contours: tp.Sequence[np.ndarray]
 ) -> None:
     """Keep only the pixels inside the contours.
 
@@ -90,15 +99,14 @@ def filter_contours(
     if len(contours) == 0:
         assert False, "No contours"
 
-    shape = (m, n) = image.image.shape[:2]
-    image_filter = np.zeros(shape, dtype=image.image.dtype)
+    shape = (m, n) = image_array.shape[:2]
+    image_filter = np.zeros(shape, dtype=image_array.dtype)
     image_filter = cv2.drawContours(image_filter, contours, -2, 255, cv2.FILLED)
 
-    if invert:
-        image.invert()
-    image.image = cv2.copyTo(image.image, mask=image_filter)
-    if invert:
-        image.invert()
+    # image.image = cv2.copyTo(image, mask=image_filter)
+    foo = np.sum(image_array)
+    image_array[:] = cv2.copyTo(image_array, mask=image_filter)
+    assert np.sum(image_array) != foo
 
     # _, binary_image = cv2.threshold(image.image, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
     # cv2.bitwise_and(image_filter, binary_image, dst=image.image)
@@ -119,7 +127,7 @@ def remove_contours(image: Image, contours: tp.Sequence[np.ndarray], fill_value:
 
 def filter_image(
     *,
-    image: Image,
+    image_array: np.ndarray,
     binary_mask: np.ndarray,
     fill_value: int = None
 ) -> None:
@@ -129,9 +137,9 @@ def filter_image(
         assert False, "Binary mask must be boolean."""
 
     if _fill_value is None:
-        _fill_value = np.argmax(np.bincount(image.image.ravel()))
+        _fill_value = np.argmax(np.bincount(image_array.ravel()))
 
-    image.image[binary_mask] = _fill_value
+    image_array[binary_mask] = _fill_value
 
 
 def get_contour_interior(contour: np.ndarray) -> np.ndarray:
@@ -175,7 +183,6 @@ def get_contours(
     contour_mode: int = cv2.RETR_EXTERNAL,       # Retreive only the external contours
     contour_method: int = cv2.CHAIN_APPROX_TC89_L1      # Apply a flavor of the Teh Chin chain approx algo
 ) -> tp.List[np.ndarray]:
-
     """Find contours in a binary image."""
     contours = cv2.findContours(image.image, contour_mode, contour_method)
     contours = imutils.grab_contours(contours)
@@ -196,3 +203,11 @@ def match_rectangle(c: np.ndarray, rectangle_approx_tol: float = 0.04):
         # Check angles for rectangle
         if max(abs(angles - np.pi/2)) < 0.1  * np.pi:       # 0.1
             return approx
+
+
+def save(image_array: np.ndarray, directory: Path, name: str) -> None:
+    """Save `image_array` in `path` with name as a png."""
+    directory.mkdir(exist_ok=True, parents=True)
+
+    # TODO: Problems with png resolution
+    cv2.imwrite(str(directory / f"{name}.png"), image_array)

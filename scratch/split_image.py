@@ -1,8 +1,10 @@
 import numpy as np
 import matplotlib.pyplot as plt
+import typing as tp
 
 import cv2
 import math
+import argparse
 
 from pathlib import Path
 
@@ -10,6 +12,9 @@ from dgimage import (
     Image,
     read_image,
     save_image,
+    resample,
+    get_axis,
+    dump_image
 )
 
 from dgutils import (
@@ -22,7 +27,7 @@ from dgutils import (
 
 def markers(image: Image, kernel_length: int = 5):
     """Return the contours of the black square markers."""
-    image.bgr_to_gray()
+    assert len(image.image.shape) == 2, f"Expecting binary image"
     image.invert()
     image.blur(9)
     image.threshold(150)
@@ -43,13 +48,12 @@ def markers(image: Image, kernel_length: int = 5):
 
     contours = get_contours(image=image)
     features = match_contours(matcher=get_marker_matcher(image=image), contours=contours)
-
-    print("Num markers: ", len(features))
     image.reset_image()
     return features
 
 
 def split_image(image):
+    image.bgr_to_gray()
     rectangles = markers(image)
 
     rectangle_array = np.zeros((len(rectangles), 4, 2))
@@ -86,7 +90,7 @@ def split_image(image):
             new_image = image.image[:, min_index:max_index]
         else:
             new_image = image.image[min_index:max_index, :]
-        new_image_list.append(new_image)
+        new_image_list.append(Image(new_image))
         rectangle_indices += 1
     return new_image_list
 
@@ -95,11 +99,33 @@ def run(filepath: Path, identifier: str):
     image = read_image(filepath)
     image_list = split_image(image)
 
+    for image in image_list:
+        image.bgr_to_gray()
+        features = markers(image)
+
+        axis, scale = get_axis(image, features)
+        image.set_axis(axis)
+        image.set_scale(scale)
+        old_scale = scale
+        image.reset_image()
+        resample(image, step_x=2.5e-4, step_y=2.5e-4)
+        image.checkpoint()
+
+        # Recompute scale
+        image.bgr_to_gray()
+        features = markers(image)       # 
+        axis, scale = get_axis(image, features)
+        image.set_axis(axis)
+        image.set_scale(scale)
+
     output_directory = Path(f"{identifier}_tmp_splits")
     output_directory.mkdir(exist_ok=True)
 
     for i, image in enumerate(image_list):
-        save_image(output_directory / f"split{i}_{identifier}.png", Image(image))
+        print(image.image.shape)
+        print(image.scale)
+        save_image(output_directory / f"split{i}_{identifier}.png", image)
+        dump_image(output_directory / f"split{i}_{identifier}.pkl", image)
 
 
 if __name__ == "__main__":

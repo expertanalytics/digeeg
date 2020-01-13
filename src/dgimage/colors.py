@@ -1,11 +1,15 @@
 from enum import Enum
 import numpy as np
 
+import logging
+
 import matplotlib.colors as mcolors
 
 
-class Colors(Enum):
+logger = logging.getLogger(__name__)
 
+
+class Colors(Enum):
     RED = (0, 0, 255)
     YELLOW = (0, 255, 255)
     LIME = (0, 255, 0)
@@ -26,11 +30,9 @@ class Colors(Enum):
     GRAY = (125, 125, 125)
     BLACK = (0, 0, 0)
 
-    @property
     def bgr(self):
         return self.value
 
-    @property
     def bgr_normal(self):
         return tuple(map(lambda x: x/255, self.value))
 

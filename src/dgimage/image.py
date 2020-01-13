@@ -3,8 +3,8 @@ from pathlib import Path
 import dataclasses
 import collections
 import itertools
-
-import operator
+import pickle
+import logging
 
 import cv2
 import imutils
@@ -21,6 +21,9 @@ from .colors import Colors
 from .image_utils import get_image_moment, color_to_grayscale, grayscale_to_color
 
 
+logger = logging.getLogger(__name__)
+
+
 @dataclasses.dataclass
 class Image:
     image_orig: np.ndarray
@@ -33,9 +36,12 @@ class Image:
         self.checkpoint_dict: tp.Dict[str, np.ndarray] = dict()
         self.reset_image()
 
-    def checkpoint(self, tag: str):
+    def checkpoint(self, tag: str = None):
         """Set image_orig to current image."""
-        self.checkpoint_dict[tag] = self.copy_image()
+        if tag is None:
+            self.image_orig = self.copy_image()
+        else:
+            self.checkpoint_dict[tag] = self.copy_image()
 
     def copy_image(self):
         """Return a copy of `self.image`."""
@@ -55,7 +61,7 @@ class Image:
     def gray_to_bgr(self) -> None:
         self.image = grayscale_to_color(self.image)
 
-    def threshold(self, thresh_val: float = None) -> None:
+    def threshold(self, thresh_val: float = -1) -> None:
         """Apply a fixed level threshold to each pixel.
 
         dst(x, y) = maxval if src(x, y) > thresh_val else 0
@@ -65,7 +71,7 @@ class Image:
 
         It is recommended to blur the image before binarisation.
         """
-        if thresh_val is None:
+        if thresh_val == -1:
             cv2.threshold(self.image, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU, dst=self.image)
         else:
             cv2.threshold(self.image, thresh_val, 255, cv2.THRESH_BINARY, dst=self.image)
@@ -155,7 +161,10 @@ class Image:
             cv2.destroyAllWindows()
         return image_draw
 
+
 def read_image(filepath: Path) -> Image:
+    if not filepath.exists():
+        raise FileNotFoundError(filepath)
     image_array = cv2.imread(str(filepath))
     return Image(image_array)
 
@@ -164,6 +173,18 @@ def save_image(filepath: Path, image: Image):
     success = cv2.imwrite(str(filepath.resolve()), image.image)
     if not success:
         raise IOError("Failed to save image")
+
+
+def dump_image(filepath: Path, image: Image):
+    with filepath.open("wb") as outpath:
+        pickle.dump(image, outpath)
+
+
+def load_image(filepath: Path) -> Image:
+    if not filepath.exists():
+        raise FileNotFoundError(filepath)
+    with filepath.open("rb") as infile:
+        return pickle.load(infile)
 
 
 if __name__ == "__main__":

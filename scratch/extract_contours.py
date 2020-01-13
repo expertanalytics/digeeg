@@ -18,6 +18,7 @@ from dgimage import (
     save_image,
     resample,
     get_axis,
+    load_image
 )
 
 from dgutils import (
@@ -101,7 +102,7 @@ def extract_contours(
     blur_kernel_size: int = 3,
     dilate_kernel_size: int = 3,
     num_dilate_iterations: int= 3
-) -> None:
+) -> tp.Sequence[np.ndarray]:
     # Remove initial guess at contours. This should leave the text blocks.
     image.invert()
     contours = get_contours(image=image)
@@ -122,12 +123,12 @@ def extract_contours(
         contours=contours
     )
 
-    filter_contours(image=image, contours=features)
+    filter_contours(image_array=image.image, contours=features)
     image.morph(cv2.MORPH_DILATE, (dilate_kernel_size, dilate_kernel_size), num_dilate_iterations)
     image_mask = image.copy_image()
 
     image.reset_image("preprocessed")
-    filter_image(image=image, binary_mask=image_mask == 255)
+    filter_image(image_array=image.image, binary_mask=image_mask == 255)
     image.checkpoint("preprocessed")
 
     # Match the remaining graph candidates, and remove everything else
@@ -138,12 +139,17 @@ def extract_contours(
 
     contours = get_contours(image=image)
     features = match_contours(matcher=get_graph_matcher(), contours=contours)
-    filter_contours(image=image, contours=features)
+    filter_contours(image_array=image.image, contours=features)
 
     image.reset_image("resampled")
 
-    filter_contours(image=image, contours=features, invert=True)
-    image.threshold()
+    # TODO: Why invert?
+    image.invert()
+    filter_contours(image_array=image.image, contours=features)
+    image.invert()
+
+    image.blur(blur_kernel_size)
+    image.threshold(100)
 
     image.invert()
     contours = get_contours(image=image)
@@ -153,16 +159,18 @@ def extract_contours(
 
 def prepare_lines(image):
     # Reorient the image to align with axis
-    markers(image)
-    image.reset_image()
-    resample(image, step_x=2.5e-4, step_y=2.5e-4)
+    # markers(image)
+    # image.reset_image()
+    # resample(image, step_x=2.5e-4, step_y=2.5e-4)
 
     image.bgr_to_gray()
     image.checkpoint("resampled")
 
     remove_background(image=image, smooth_kernel_size=3)
-
     features = extract_contours(image=image, blur_kernel_size=3)
+
+    image.invert()
+    foo = image.draw(features, show=False, lw=3)
     return features
 
 
@@ -198,29 +206,27 @@ def find_datapoints(image, start=8100):
         peaks = sorted(tmp_peaks, key=lambda x: filtered_signal[x], reverse=True)[:4]
 
         yield i, filtered_signal[peaks]
-        # fig, (ax1, ax2) = plt.subplots(2)
+        fig, (ax1, ax2) = plt.subplots(2)
 
-        # ax2.imshow(_image, cmap="gray")
-        # ax2.axvline(i)
+        ax2.imshow(_image, cmap="gray")
+        ax2.axvline(i)
 
-        # ax1.plot(x, raw_signal)
-        # ax1.plot(x, filtered_signal, "--")
-        # ax1.plot(x[peaks], filtered_signal[peaks], "x")
-        # plt.show()
-        # plt.close(fig)
-        # return
+        ax1.plot(x, raw_signal)
+        ax1.plot(x, filtered_signal, "--")
+        ax1.plot(x[peaks], filtered_signal[peaks], "x")
+        plt.show()
+        plt.close(fig)
+        return
 
 
 def extract_data(image):
     print(image.image.shape)
-
 
     times = []
     data_list = []
     for t, data in find_datapoints(image, start=100):
         if data.size == 4:
             times.append(t)
-            # assert len(data) == 4
             data_list.append(list(data))
         else:
             data_list.append(np.zeros(4))
@@ -238,11 +244,27 @@ def extract_data(image):
     plt.show()
 
 
-if __name__ == "__main__":
-    filename = "scan4_tmp_splits/split3_scan4.png"
-    image = read_image(filename)
+def run(case):
+    filename = f"scan4_tmp_splits/split{case}_scan4.pkl"
+    image = load_image(Path(filename))
     features = prepare_lines(image)
 
+    image.reset_image("resampled")
+    image.invert()
+
+    outpath = Path(f"tmp_contours{case}")
+    outpath.mkdir(exist_ok=True)
+
+    for i, c in enumerate(features):
+        tmp_image = image.copy_image()
+
+        filter_contours(image_array=tmp_image, contours=[c])
+        clipped_contour = tmp_image[~np.all(tmp_image == 0, axis=1)]
+        np.save(outpath / f"image_contour{i}.npy", clipped_contour)
+
+    ##################
+    ### Make image ###
+    ##################
 
     tmp_image = np.ones((*image.image.shape, 3), dtype=np.uint8)
     tmp_image[:] = (255, 255, 255)      # White
@@ -260,19 +282,31 @@ if __name__ == "__main__":
 
         tmp_image2 = np.zeros(tuple(map(math.ceil, (y1, x1))), dtype=np.uint8)
         tmp_image2 = cv2.drawContours(tmp_image2, features, i, 255, cv2.FILLED)
-        np.save(f"tmp_contours/contour{i}.npy", tmp_image2)
+        # np.save(f"tmp_contours/contour{i}.npy", tmp_image2)
 
-        ann = ax.annotate(
-            f"Contour {i}",
-            xy=(x0, y1),
-            xycoords="data",
-            xytext=(0, 35),
-            textcoords="offset points",
-            size=10,
-            bbox=dict(
-                boxstyle="round",
-                fc=color       # normalised color
+        if True:
+            ann = ax.annotate(
+                f"Contour {i}",
+                xy=(x0, y1),
+                xycoords="data",
+                xytext=(0, 35),
+                textcoords="offset points",
+                size=10,
+                bbox=dict(
+                    boxstyle="round",
+                    fc=color       # normalised color
+                )
             )
-        )
-    plt.imshow(tmp_image)
+
+    ax.imshow(tmp_image)
+    ax.set_title("A digitised paper strip")
+    ax.set_xticklabels(["{:.1f} cm".format(15*i/image.scale) for i in ax.get_xticks()])
+    ax.set_yticklabels(["{:.1f} cm".format(15*i/image.scale) for i in ax.get_yticks()])
+    ax.set_ylabel("Voltage")
+    ax.set_xlabel("Time")
+    fig.savefig(f"contours{case}.png")
     plt.show()
+
+if __name__ == "__main__":
+    for case in range(5):
+        run(case)

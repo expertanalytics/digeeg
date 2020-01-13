@@ -2,12 +2,15 @@ import numpy as np
 import typing as tp
 
 import dataclasses
-
 import cv2
+import logging
 
 from .line import Line
 from .image import Image
 from .image_utils import get_image_moment
+
+
+logger = logging.getLogger(__name__)
 
 
 def get_axis(image: Image, rectangles: tp.List[np.ndarray]):
@@ -42,7 +45,7 @@ def get_axis(image: Image, rectangles: tp.List[np.ndarray]):
 
     # Equation for x-axis -- best fit for centreline
     # x_axis = Line(a, b, (c + d)/2)
-    x_axis = Line(a, b, min(c, d))      # use min(c, d) to get closes to edge of image
+    x_axis = Line(a, b, max(c, d))      # use min(c, d) to get closes to edge of image
 
     # Get image gentroid and orient the line
     image_centre = get_image_moment(image.image, order=1)
