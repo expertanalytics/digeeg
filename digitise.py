@@ -115,9 +115,10 @@ def main() -> None:
     # loop over all the splits and feed to segment_trace
     for split_child in split_directory.iterdir():
         logger.info(f"segmenting {split_child}")
-        split_number = pattern.findall(str(split_child))[0]
+        pattern_matches = pattern.findall(str(split_child))
         if len(pattern_matches) != 1:      # Wrong format to be a split
             continue
+        split_number = pattern_matches[0]
 
         trace_directory = segment_trace(
             split_child,
@@ -127,11 +128,10 @@ def main() -> None:
         )
 
         for trace_child in trace_directory.iterdir():
-            pattern_matches = pattern.findall(str(split_child))
-            trace_number = pattern.findall(str(trace_child))[0]
-            logger.info(f"Digitising {trace_child}")
             if "annotated" in trace_child.stem:
                 continue
+            trace_number = pattern.findall(str(trace_child))[0]
+            logger.info(f"Digitising {trace_child}")
             # Assume all trace_children are segented lines
             # from IPython import embed; embed()
             # assert False, trace_number
