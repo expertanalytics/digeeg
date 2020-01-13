@@ -6,6 +6,7 @@ import re
 import shutil
 import logging
 import os
+import sys
 
 from pathlib import Path
 
@@ -21,12 +22,16 @@ def split_image(
     session_number: int
 ) -> Path:
     outpath = base_output_directory / f"round{round_number}_S{session_number}"
-    subprocess.run([
-        "split-image",
-        "-i", str(input_file),
-        "-o", outpath,
-        "-n", f"session{session_number}"
-    ])
+    try:
+        subprocess.check_output([
+            "split-image",
+            "-i", str(input_file),
+            "-o", outpath,
+            "-n", f"session{session_number}"
+        ])
+    except subprocess.CalledProcessError as e:
+        print(e)
+        sys.exis(1)
     return Path(outpath)
 
 
@@ -37,12 +42,16 @@ def segment_trace(
     split_number: int
 ) -> Path:
     outpath = output_base_directory / f"split{split_number}"
-    subprocess.run([
-        "segment-traces",
-        "-i", str(input_file),
-        "-o", outpath,
-        "-n", f"session{session_number}"
-    ])
+    try:
+        subprocess.check_output([
+            "segment-traces",
+            "-i", str(input_file),
+            "-o", outpath,
+            "-n", f"session{session_number}"
+        ])
+    except subprocess.CalledProcessError as e:
+        print(e)
+        sys.exis(1)
     return Path(outpath)
 
 
@@ -51,12 +60,16 @@ def digitise_trace(
     output_directory: Path,
     session_number: int,
 ) -> None:
-    subprocess.run([
-        "digitise-traces",
-        "-i", input_file,
-        "-o", str(output_directory),
-        "-n", f"{session_number}"
-    ])
+    try:
+        subprocess.check_output([
+            "digitise-traces",
+            "-i", input_file,
+            "-o", str(output_directory),
+            "-n", f"{session_number}"
+        ])
+    except subprocess.CalledProcessError as e:
+        print(e)
+        sys.exis(1)
 
 
 def create_parser() -> argparse.ArgumentParser:
@@ -66,6 +79,13 @@ def create_parser() -> argparse.ArgumentParser:
         "--input",
         help="Input EEG",
         required=True,
+    )
+
+    parser.add_argument(
+        "-o",
+        "--output",
+        help="Output base directory",
+        required=True
     )
 
     parser.add_argument(
@@ -104,9 +124,10 @@ def main() -> None:
     args = parser.parse_args()
     # clean diectory
 
-    output_base = Path(f"splits_E{args.patient_id}")
-    if args.clean_directory:
+    output_base = Path(f"{args.output}{args.patient_id}")
+    if args.clean_directory and output_base.is_dir():
         shutil.rmtree(output_base)
+    output_base.mkdir(exist_ok=True, parents=True)
 
     split_directory = split_image(args.input, output_base, args.round_number, args.session_number)
 
