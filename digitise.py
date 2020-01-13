@@ -4,12 +4,14 @@ import subprocess
 import argparse
 import re
 import shutil
+import logging
+import os
 
 from pathlib import Path
 
-# E ($2) -- Patient ID
-# R ($3) -- Round 1, round 2 etc.
-# S ($4) -- Session number
+
+logging.basicConfig(level=os.environ.get("LOGLEVEL", "INFO"))
+logger = logging.getLogger(__name__)
 
 
 def split_image(
@@ -53,7 +55,7 @@ def digitise_trace(
         "digitise-traces",
         "-i", input_file,
         "-o", str(output_directory),
-        "-n", f"session{session_number}"
+        "-n", f"{session_number}"
     ])
 
 
@@ -108,16 +110,15 @@ def main() -> None:
 
     split_directory = split_image(args.input, output_base, args.round_number, args.session_number)
 
-    pattern = re.compile("split(\d+)\.png")
+    pattern = re.compile("(\d+)\.png")
 
     # loop over all the splits and feed to segment_trace
     for split_child in split_directory.iterdir():
-        print(f"segmenting {split_child}")
-        pattern_matches = pattern.findall(str(split_child))
+        logger.info(f"segmenting {split_child}")
+        split_number = pattern.findall(str(split_child))[0]
         if len(pattern_matches) != 1:      # Wrong format to be a split
             continue
 
-        split_number = int(pattern_matches[0])
         trace_directory = segment_trace(
             split_child,
             output_base / f"round{args.round_number}_S{args.session_number}",
@@ -126,11 +127,15 @@ def main() -> None:
         )
 
         for trace_child in trace_directory.iterdir():
+            pattern_matches = pattern.findall(str(split_child))
+            trace_number = pattern.findall(str(trace_child))[0]
+            logger.info(f"Digitising {trace_child}")
             if "annotated" in trace_child.stem:
                 continue
-            print(f"digitising {trace_child}")
             # Assume all trace_children are segented lines
-            digitise_trace(trace_child, split_directory, args.session_number)
+            # from IPython import embed; embed()
+            # assert False, trace_number
+            digitise_trace(trace_child, trace_child.parents[0], trace_number)
 
 
 if __name__ == "__main__":
