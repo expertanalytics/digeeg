@@ -31,7 +31,7 @@ def split_image(
         ])
     except subprocess.CalledProcessError as e:
         print(e)
-        sys.exis(1)
+        sys.exit(1)
     return Path(outpath)
 
 
@@ -39,19 +39,25 @@ def segment_trace(
     input_file: Path,
     output_base_directory: Path,
     session_number: int,
-    split_number: int
+    split_number: int,
+    color_filters: bool
 ) -> Path:
     outpath = output_base_directory / f"split{split_number}"
+    command = [
+        "segment-traces",
+        "-i", str(input_file),
+        "-o", outpath,
+        "-n", f"session{session_number}"
+    ]
+
+    if color_filters:
+        command.append(["--blue-color_filter", "--red-color-filter"])
+
     try:
-        subprocess.check_output([
-            "segment-traces",
-            "-i", str(input_file),
-            "-o", outpath,
-            "-n", f"session{session_number}"
-        ])
+        subprocess.check_output(command)
     except subprocess.CalledProcessError as e:
         print(e)
-        sys.exis(1)
+        sys.exit(1)
     return Path(outpath)
 
 
@@ -69,7 +75,7 @@ def digitise_trace(
         ])
     except subprocess.CalledProcessError as e:
         print(e)
-        sys.exis(1)
+        sys.exit(1)
 
 
 def create_parser() -> argparse.ArgumentParser:
@@ -107,6 +113,13 @@ def create_parser() -> argparse.ArgumentParser:
         "--session-number",
         help="The session number within one ECT round or course.",
         required=True,
+    )
+
+    parser.add_argument(
+        "-color-filter",
+        help="Turn on blue and red color filters.",
+        action="store_true",
+        required=False
     )
 
     parser.add_argument(
