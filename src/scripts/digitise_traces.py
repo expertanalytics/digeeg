@@ -123,7 +123,7 @@ def run(
     ax1.imshow(new_image, cmap="gray")
     ax2.plot(x_arr, y_arr)
     output_directory.mkdir(exist_ok=True, parents=True)
-    fig.savefig(output_directory / f"trace{identifier}_imageQC.png")
+    # fig.savefig(output_directory / f"trace{identifier}_imageQC.png")
     if show:
         plt.show()
         plt.close(fig)

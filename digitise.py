@@ -52,10 +52,10 @@ def segment_trace(
     ]
 
     if horisontal_lines:
-        command.append(["--horisontal-kernel-length", "500"])
+        command += ["--horisontal-kernel-length", "500"]
 
     if color_filters:
-        command.append(["--blue-color_filter", "--red-color-filter"])
+        command += ["--blue-color-filter", "--red-color-filter"]
 
     try:
         subprocess.check_output(command)
@@ -127,11 +127,7 @@ def create_parser() -> argparse.ArgumentParser:
     )
 
     parser.add_argument(
-<<<<<<< HEAD
-        "-color-filter",
-=======
         "--color-filter",
->>>>>>> exposing color filter and horisonta lines to super script cli.
         help="Turn on blue and red color filters.",
         action="store_true",
         required=False

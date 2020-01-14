@@ -117,8 +117,8 @@ def run(
     background_kernel_size=5,
     scale: float = None,
     debug: bool = False,
-    blue_color_filter: bool = False,
-    red_color_filter: bool = False,
+    blue_color_filter: tp.Sequence[int] = None,
+    red_color_filter: tp.Sequence[int] = None,
     horisontal_kernel_length: int = None
 ):
     """Remove the background, segment the contours and save the segmented lines as pngs."""
@@ -128,11 +128,16 @@ def run(
         debug_path = get_debug_path("prepare_lines")
         save(image.image, debug_path, "input")
 
-    if blue_color_filter:
-        blue_mask = cv2.inRange(image.image, (90, 20, 20), (255, 100, 100))
+    if blue_color_filter is not None:
+        lower = tuple(map(int, blue_color_filter[:3]))
+        upper = tuple(map(int, blue_color_filter[3:]))
+        print(lower, upper)
+        blue_mask = cv2.inRange(image.image, lower, upper)
         image.image[blue_mask == 255] = 255
-    if red_color_filter:
-        red_mask = cv2.inRange(image.image, (20, 20, 90), (100, 100, 255))
+    if red_color_filter is not None:
+        lower = tuple(map(int, red_color_filter[:3]))
+        upper = tuple(map(int, red_color_filter[3:]))
+        red_mask = cv2.inRange(image.image, lower, upper)
         image.image[red_mask == 255] = 255
 
     image.bgr_to_gray()
@@ -143,16 +148,10 @@ def run(
         horisontal_kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (horisontal_kernel_length, 1))
         detected_lines = cv2.morphologyEx(image.image, cv2.MORPH_OPEN, horisontal_kernel, iterations=1)
         # findContours returns (contours, hierarchy)
-        contours = cv2.FindContours(detected_lines, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)[0]
-
-        # TODO: Remove this?
-        # if len(contours) == 2:
-        #     contours = contours[0]
-        # else:
-        #     contours = contours[1]
+        contours = cv2.findContours(detected_lines, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)[0]
 
         for c in contours:
-            cv2.drawContour(image.image, [c], -1, 0, -10)
+            cv2.drawContours(image.image, [c], -1, 0, -10)
         image.invert()
 
     remove_background(
@@ -165,6 +164,9 @@ def run(
     image.checkpoint("remove_background")
 
     features = extract_contours(image=image, debug=debug)
+
+    quality_control_image = image.draw(features, show=False)
+    cv2.imwrite(str(output_directory / f"QC_{identifier}.png"), quality_control_image)
 
     if debug:
         save(image.image, debug_path, "remove_background")
@@ -300,16 +302,20 @@ def create_parser() -> argparse.ArgumentParser:
 
     parser.add_argument(
         "--blue-color-filter",
-        action="store_true",
-        help="Use default blue color filter",
-        required=False
+        nargs="+",
+        help="Three band BGR color filter. Specify as a sequence of six integers,\
+              e.g. (90, 10, 10, 255, 90, 90)",
+        required=False,
+        default=None
     )
 
     parser.add_argument(
         "--red-color-filter",
-        action="store_true",
-        help="Use default blue color filter",
-        required=False
+        nargs="+",
+        help="Three band BGR color filter. Specify as a sequence of six integers,\
+             e.g. (90, 10, 10, 255, 90, 90)",
+        required=False,
+        default=None
     )
 
     return parser
