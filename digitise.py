@@ -40,7 +40,8 @@ def segment_trace(
     output_base_directory: Path,
     session_number: int,
     split_number: int,
-    color_filters: bool
+    horisontal_lines: bool,
+    color_filters: bool,
 ) -> Path:
     outpath = output_base_directory / f"split{split_number}"
     command = [
@@ -49,6 +50,9 @@ def segment_trace(
         "-o", outpath,
         "-n", f"session{session_number}"
     ]
+
+    if horisontal_lines:
+        command.append(["--horisontal-kernel-length", "500"])
 
     if color_filters:
         command.append(["--blue-color_filter", "--red-color-filter"])
@@ -116,6 +120,13 @@ def create_parser() -> argparse.ArgumentParser:
     )
 
     parser.add_argument(
+        "--remove-horisontal-lines",
+        help="Remove horisontal lines.",
+        action="store_true",
+        required=False
+    )
+
+    parser.add_argument(
         "-color-filter",
         help="Turn on blue and red color filters.",
         action="store_true",
@@ -158,7 +169,9 @@ def main() -> None:
             split_child,
             output_base / f"round{args.round_number}_S{args.session_number}",
             args.session_number,
-            split_number
+            split_number,
+            args.remove_horisontal_lines,
+            args.color_filter
         )
 
         for trace_child in trace_directory.iterdir():
