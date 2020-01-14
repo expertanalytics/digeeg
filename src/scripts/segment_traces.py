@@ -118,7 +118,8 @@ def run(
     scale: float = None,
     debug: bool = False,
     blue_color_filter: bool = False,
-    red_color_filter: bool = False
+    red_color_filter: bool = False,
+    horisontal_kernel_length: int = None
 ):
     """Remove the background, segment the contours and save the segmented lines as pngs."""
     image = read_image(input_image_path)
@@ -136,6 +137,23 @@ def run(
 
     image.bgr_to_gray()
     image.checkpoint("resampled")
+
+    if horisontal_kernel_length is not None:
+        image.invert()
+        horisontal_kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (horisontal_kernel_length, 1))
+        detected_lines = cv2.morphologyEx(image.image, cv2.MORPH_OPEN, horisontal_kernel, iterations=1)
+        # findContours returns (contours, hierarchy)
+        contours = cv2.FindContours(detected_lines, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)[0]
+
+        # TODO: Remove this?
+        # if len(contours) == 2:
+        #     contours = contours[0]
+        # else:
+        #     contours = contours[1]
+
+        for c in contours:
+            cv2.drawContour(image.image, [c], -1, 0, -10)
+        image.invert()
 
     remove_background(
         image=image,
@@ -273,6 +291,14 @@ def create_parser() -> argparse.ArgumentParser:
     )
 
     parser.add_argument(
+        "--horisontal-kernel-length",
+        help="Kernel length for removing horisontal lines",
+        type= int,
+        default=None,
+        required=False
+    )
+
+    parser.add_argument(
         "--blue-color-filter",
         action="store_true",
         help="Use default blue color filter",
@@ -302,6 +328,7 @@ def main() -> None:
         background_kernel_size=args.background_kernel_size,
         scale=args.scale,
         debug=args.debug,
+        horisontal_kernel_length=args.horisontal_kernel_length,
         blue_color_filter=args.blue_color_filter,
         red_color_filter=args.red_color_filter
     )
