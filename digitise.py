@@ -127,7 +127,11 @@ def create_parser() -> argparse.ArgumentParser:
     )
 
     parser.add_argument(
+<<<<<<< HEAD
         "-color-filter",
+=======
+        "--color-filter",
+>>>>>>> exposing color filter and horisonta lines to super script cli.
         help="Turn on blue and red color filters.",
         action="store_true",
         required=False
