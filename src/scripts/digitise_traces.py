@@ -73,6 +73,7 @@ def run(
     input_image_path: Path,
     output_directory: Path,
     identifier: str,
+    scale: float = None,
     start_column: int = 0,
     show: bool = False,
     show_step: bool = False
@@ -132,6 +133,9 @@ def run(
     out_array[:, 0] = x_arr
     out_array[:, 1] = y_arr
 
+    if scale is not None:
+        out_array *= 15/scale
+
     output_directory.mkdir(exist_ok=True, parents=True)
     np.save(output_directory / f"trace{identifier}", out_array)
 
@@ -163,6 +167,14 @@ def create_parser() -> argparse.ArgumentParser:
     )
 
     parser.add_argument(
+        "--scale",
+        help="Scale the digitised trace. The actual scale is `15/scale`, or number of pixels in 15 cm",
+        required=False,
+        default=None,
+        type=float,
+    )
+
+    parser.add_argument(
         "--start",
         help="Start to digitise from `start`",
         type=int,
@@ -190,7 +202,7 @@ def create_parser() -> argparse.ArgumentParser:
 def main() -> None:
     parser = create_parser()
     args = parser.parse_args()
-    run(args.input, args.output, args.name, args.start, args.show, args.show_step)
+    run(args.input, args.output, args.name, args.scale, args.start, args.show, args.show_step)
 
 if __name__ == "__main__":
     main()

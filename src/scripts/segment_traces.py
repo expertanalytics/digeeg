@@ -50,6 +50,7 @@ from dgutils import remove_structured_background
 
 
 logging.basicConfig(level=os.environ.get("LOGLEVEL", "INFO"))
+logger = logging.getLogger(__name__)
 
 
 def remove_background(
@@ -80,31 +81,6 @@ def remove_background(
 
     image.invert()
     image.checkpoint("preprocessed")
-
-
-def extract_contours(
-    *,
-    image: Image,
-    debug: bool = True
-) -> tp.List[np.ndarray]:
-    """Segment the EEG traces.
-
-    Use a series of convolutions, filtering and edge tracking to extract the contours.
-
-    blur_kernel_size:
-        Used in conjunction with thresholding to binarise the image.
-    dilate_kernel_size:
-        Dilation is used with filtering to be aggressive in removing elements.
-    num_dilate_iterations:
-        THe number of dilate iterations.
-    """
-    if debug:
-        debug_path = get_debug_path("extract_contours")
-        save(image.image, debug_path, "input")
-    image.invert()
-    contours = get_contours(image=image)
-    features = match_contours(matcher=get_graph_matcher(), contours=contours)
-    return features
 
 
 def run(
@@ -140,6 +116,7 @@ def run(
         red_mask = cv2.inRange(image.image, lower, upper)
         image.image[red_mask == 255] = 255
 
+    image.invert()
     image.bgr_to_gray()
     image.checkpoint("resampled")
 
@@ -163,7 +140,10 @@ def run(
     )
     image.checkpoint("remove_background")
 
-    features = extract_contours(image=image, debug=debug)
+    if debug:
+        save(image.image, debug_path, "match_contours")
+    contours = get_contours(image=image)
+    features = match_contours(matcher=get_graph_matcher(), contours=contours)
 
     quality_control_image = image.draw(features, show=False)
     cv2.imwrite(str(output_directory / f"QC_{identifier}.png"), quality_control_image)
@@ -187,11 +167,8 @@ def run(
     ### Make annotated image ###
     ############################
 
-    tmp_image = np.ones((*image.image.shape, 3), dtype=np.uint8)
-    tmp_image[:] = (255, 255, 255)      # White
-
     fig, ax = plt.subplots(1, figsize=(15, 10), dpi=500)
-    ax.imshow(tmp_image)
+    tmp_image = image.image_orig
 
     color_iterator = itertools.cycle(mtableau_brg())
 
@@ -201,16 +178,13 @@ def run(
         polygon = Polygon(c.reshape(-1, 2))
         x0, y0, x1, y1 = polygon.bounds
 
-        tmp_image2 = np.zeros(tuple(map(math.ceil, (y1, x1))), dtype=np.uint8)
-        tmp_image2 = cv2.drawContours(tmp_image2, features, i, 255, cv2.FILLED)
-
         ann = ax.annotate(
             f"Contour {i}",
             xy=(x0, y1),
             xycoords="data",
             xytext=(0, 35),
             textcoords="offset points",
-            size=10,
+            size=7,
             bbox=dict(
                 boxstyle="round",
                 fc=color       # normalised color

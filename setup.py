@@ -15,7 +15,8 @@ setup(
         "matplotlib",
         "imutils",
         "pylint",
-        "scipy"
+        "scipy",
+        "h5py"
     ],
     entry_points={
         "console_scripts": [
@@ -24,6 +25,7 @@ setup(
             "segment-traces-bw = scripts.segment_traces_bw:main",
             "digitise-traces = scripts.digitise_traces:main",
             "plot-trace = scripts.plot_array:main",
+            "visualise = scripts.visualise:main",
         ]
     }
 )

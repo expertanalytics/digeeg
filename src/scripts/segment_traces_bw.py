@@ -24,11 +24,12 @@ from dgimage import (
 from dgutils import (
     get_debug_path,
     filter_contours,
+    get_contours,
+    match_contours,
+    get_graph_matcher,
     save,
     plot,
 )
-
-from .extract_traces import extract_contours
 
 
 logging.basicConfig(level=os.environ.get("LOGLEVEL", "INFO"))
@@ -45,10 +46,15 @@ def run(
 ):
     """Segment the contours from a black and white image and save the segmented lines."""
     image = read_image(input_image_path)
+    if debug:
+        debug_path = get_debug_path("remove_background")
+        save(image.image, debug_path, "input")
     image.bgr_to_gray()
-    image.invert()
 
-    features = extract_contours(image=image, debug=debug)
+    if debug:
+        save(image.iamge, debug_path, "match_contours")
+    contours = get_contours(image=image)
+    features = match_contours(matcher=get_graph_matcher(), contours=contours)
 
     if debug:
         debug_path = get_debug_path("extract_contours_bw")
@@ -66,11 +72,8 @@ def run(
     ### Make annotated image ###
     ############################
 
-    tmp_image = np.ones((*image.image.shape, 3), dtype=np.uint8)
-    tmp_image[:] = (255, 255, 255)      # White
-
     fig, ax = plt.subplots(1, figsize=(15, 10), dpi=500)
-    ax.imshow(tmp_image)
+    tmp_image = image.image_orig
 
     color_iterator = itertools.cycle(mtableau_brg())
 
@@ -79,9 +82,6 @@ def run(
         tmp_image = cv2.drawContours(tmp_image, features, i, color_to_256_RGB(color), cv2.FILLED)
         polygon = Polygon(c.reshape(-1, 2))
         x0, y0, x1, y1 = polygon.bounds
-
-        tmp_image2 = np.zeros(tuple(map(math.ceil, (y1, x1))), dtype=np.uint8)
-        tmp_image2 = cv2.drawContours(tmp_image2, features, i, 255, cv2.FILLED)
 
         ann = ax.annotate(
             f"Contour {i}",
