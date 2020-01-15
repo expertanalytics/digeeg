@@ -6,6 +6,7 @@ import re
 import shutil
 import logging
 import os
+import sys
 
 from pathlib import Path
 
@@ -21,12 +22,16 @@ def split_image(
     session_number: int
 ) -> Path:
     outpath = base_output_directory / f"round{round_number}_S{session_number}"
-    subprocess.run([
-        "split-image",
-        "-i", str(input_file),
-        "-o", outpath,
-        "-n", f"session{session_number}"
-    ])
+    try:
+        subprocess.check_output([
+            "split-image",
+            "-i", str(input_file),
+            "-o", outpath,
+            "-n", f"session{session_number}"
+        ])
+    except subprocess.CalledProcessError as e:
+        print(e)
+        sys.exit(1)
     return Path(outpath)
 
 
@@ -34,15 +39,29 @@ def segment_trace(
     input_file: Path,
     output_base_directory: Path,
     session_number: int,
-    split_number: int
+    split_number: int,
+    horisontal_lines: bool,
+    color_filters: bool,
 ) -> Path:
     outpath = output_base_directory / f"split{split_number}"
-    subprocess.run([
+    command = [
         "segment-traces",
         "-i", str(input_file),
         "-o", outpath,
         "-n", f"session{session_number}"
-    ])
+    ]
+
+    if horisontal_lines:
+        command += ["--horisontal-kernel-length", "500"]
+
+    if color_filters:
+        command += ["--blue-color-filter", "--red-color-filter"]
+
+    try:
+        subprocess.check_output(command)
+    except subprocess.CalledProcessError as e:
+        print(e)
+        sys.exit(1)
     return Path(outpath)
 
 
@@ -51,12 +70,16 @@ def digitise_trace(
     output_directory: Path,
     session_number: int,
 ) -> None:
-    subprocess.run([
-        "digitise-traces",
-        "-i", input_file,
-        "-o", str(output_directory),
-        "-n", f"{session_number}"
-    ])
+    try:
+        subprocess.check_output([
+            "digitise-traces",
+            "-i", input_file,
+            "-o", str(output_directory),
+            "-n", f"{session_number}"
+        ])
+    except subprocess.CalledProcessError as e:
+        print(e)
+        sys.exit(1)
 
 
 def create_parser() -> argparse.ArgumentParser:
@@ -66,6 +89,13 @@ def create_parser() -> argparse.ArgumentParser:
         "--input",
         help="Input EEG",
         required=True,
+    )
+
+    parser.add_argument(
+        "-o",
+        "--output",
+        help="Output base directory",
+        required=True
     )
 
     parser.add_argument(
@@ -90,6 +120,20 @@ def create_parser() -> argparse.ArgumentParser:
     )
 
     parser.add_argument(
+        "--remove-horisontal-lines",
+        help="Remove horisontal lines.",
+        action="store_true",
+        required=False
+    )
+
+    parser.add_argument(
+        "--color-filter",
+        help="Turn on blue and red color filters.",
+        action="store_true",
+        required=False
+    )
+
+    parser.add_argument(
         "--clean-directory",
         help="Clean output directory. Use with caution",
         action="store_true",
@@ -104,9 +148,10 @@ def main() -> None:
     args = parser.parse_args()
     # clean diectory
 
-    output_base = Path(f"splits_E{args.patient_id}")
-    if args.clean_directory:
+    output_base = Path(f"{args.output}{args.patient_id}")
+    if args.clean_directory and output_base.is_dir():
         shutil.rmtree(output_base)
+    output_base.mkdir(exist_ok=True, parents=True)
 
     split_directory = split_image(args.input, output_base, args.round_number, args.session_number)
 
@@ -124,7 +169,9 @@ def main() -> None:
             split_child,
             output_base / f"round{args.round_number}_S{args.session_number}",
             args.session_number,
-            split_number
+            split_number,
+            args.remove_horisontal_lines,
+            args.color_filter
         )
 
         for trace_child in trace_directory.iterdir():

@@ -21,6 +21,7 @@ def show(image_array: np.ndarray, mode: int = None):
 
 def plot(image_array: np.ndarray, cmap: str = "gray") -> None:
     """Plot the current image."""
+    assert isinstance(image_array, np.ndarray), f"Expected numpy array, got {type(image_array)}"
     fig, ax = plt.subplots(1)
     ax.imshow(image_array, cmap)
     plt.show()

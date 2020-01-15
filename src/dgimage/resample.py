@@ -44,8 +44,8 @@ def get_axis(image: Image, rectangles: tp.List[np.ndarray]):
     c, d, a, b = svd[-1][-1, :]
 
     # Equation for x-axis -- best fit for centreline
-    # x_axis = Line(a, b, (c + d)/2)
-    x_axis = Line(a, b, max(c, d))      # use min(c, d) to get closes to edge of image
+    x_axis = Line(a, b, (c + d)/2)
+    # x_axis = Line(a, b, max(c, d))      # use min(c, d) to get closes to edge of image
 
     # Get image gentroid and orient the line
     image_centre = get_image_moment(image.image, order=1)

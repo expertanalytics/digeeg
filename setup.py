@@ -15,14 +15,17 @@ setup(
         "matplotlib",
         "imutils",
         "pylint",
-        "scipy"
+        "scipy",
+        "h5py"
     ],
     entry_points={
         "console_scripts": [
             "split-image = scripts.split_image:main",
-            "segment-traces = scripts.extract_traces:main",
+            "segment-traces = scripts.segment_traces:main",
+            "segment-traces-bw = scripts.segment_traces_bw:main",
             "digitise-traces = scripts.digitise_traces:main",
             "plot-trace = scripts.plot_array:main",
+            "visualise = scripts.visualise:main",
         ]
     }
 )
