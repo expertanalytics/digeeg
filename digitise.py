@@ -42,13 +42,15 @@ def segment_trace(
     split_number: int,
     horisontal_lines: bool,
     color_filters: bool,
+    scale: float
 ) -> Path:
     outpath = output_base_directory / f"split{split_number}"
     command = [
         "segment-traces",
         "-i", str(input_file),
         "-o", outpath,
-        "-n", f"session{session_number}"
+        "-n", f"session{session_number}",
+        "--scale", f"{scale}"
     ]
 
     if horisontal_lines:
@@ -69,13 +71,15 @@ def digitise_trace(
     input_file: Path,
     output_directory: Path,
     session_number: int,
+    scale: float
 ) -> None:
     try:
         subprocess.check_output([
             "digitise-traces",
             "-i", input_file,
             "-o", str(output_directory),
-            "-n", f"{session_number}"
+            "-n", f"{session_number}",
+            "--scale", f"{scale}"
         ])
     except subprocess.CalledProcessError as e:
         print(e)
@@ -157,13 +161,20 @@ def main() -> None:
 
     pattern = re.compile("(\d+)\.png")
 
+    scale_path = split_directory / "scales.txt"
+    scale_dict = {}
+    with scale_path.open("r") as in_file:
+        for line in in_file.readlines():
+            case, scale = line.split(",")
+            scale_dict[int(case.split(":")[1])] = float(scale.split(":")[1])
+
     # loop over all the splits and feed to segment_trace
     for split_child in split_directory.iterdir():
         logger.info(f"segmenting {split_child}")
         pattern_matches = pattern.findall(str(split_child))
         if len(pattern_matches) != 1:      # Wrong format to be a split
             continue
-        split_number = pattern_matches[0]
+        split_number = int(pattern_matches[0])
 
         trace_directory = segment_trace(
             split_child,
@@ -171,7 +182,8 @@ def main() -> None:
             args.session_number,
             split_number,
             args.remove_horisontal_lines,
-            args.color_filter
+            args.color_filter,
+            scale_dict[split_number]
         )
 
         for trace_child in trace_directory.iterdir():
@@ -182,7 +194,7 @@ def main() -> None:
             # Assume all trace_children are segented lines
             # from IPython import embed; embed()
             # assert False, trace_number
-            digitise_trace(trace_child, trace_child.parents[0], trace_number)
+            digitise_trace(trace_child, trace_child.parents[0], trace_number, scale_dict[split_number])
 
 
 if __name__ == "__main__":

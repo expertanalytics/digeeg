@@ -136,7 +136,7 @@ def create_parser() -> argparse.ArgumentParser:
         "--scale",
         help="The scale of the image. What is the phusical size of a pixel.",
         default=None,
-        type=int,
+        type=float,
         required=False
     )
 
