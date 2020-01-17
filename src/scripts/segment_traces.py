@@ -121,7 +121,6 @@ def run(
     image.checkpoint("resampled")
 
     if horisontal_kernel_length is not None:
-        image.invert()
         horisontal_kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (horisontal_kernel_length, 1))
         detected_lines = cv2.morphologyEx(image.image, cv2.MORPH_OPEN, horisontal_kernel, iterations=1)
         # findContours returns (contours, hierarchy)
@@ -129,7 +128,6 @@ def run(
 
         for c in contours:
             cv2.drawContours(image.image, [c], -1, 0, -10)
-        image.invert()
 
     remove_background(
         image=image,
