@@ -19,7 +19,7 @@ def segment_trace(
     input_file: Path,
     output_path: Path,
     session_number: int,
-    horisontal_lines: bool,
+    horisontal_lines: int,
     color_filters: bool,
     scale: float
 ) -> Path:
@@ -31,8 +31,8 @@ def segment_trace(
         "--scale", f"{scale}"
     ]
 
-    if horisontal_lines:
-        command += ["--horisontal-kernel-length", "500"]
+    if horisontal_lines is not None:
+        command += ["--horisontal-kernel-length", str(horisontal_lines)]
 
     if color_filters:
         command += ["--blue-color-filter", "--red-color-filter"]
@@ -83,7 +83,8 @@ def create_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--remove-horisontal-lines",
         help="Remove horisontal lines.",
-        action="store_true",
+        type=int,
+        default=None,
         required=False
     )
 

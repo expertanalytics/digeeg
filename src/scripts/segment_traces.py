@@ -179,13 +179,12 @@ def run(
         ann = ax.annotate(
             f"Contour {i}",
             xy=(x0, y1),
-            xycoords="data",
-            xytext=(0, 35),
-            textcoords="offset points",
-            size=7,
-            bbox=dict(
-                boxstyle="round",
-                fc=color       # normalised color
+            size=5,
+            color=color,
+            arrowprops=dict(
+                arrowstyle='->',
+                connectionstyle="arc3,rad=-0.5",
+                color=color
             )
         )
 
