@@ -143,10 +143,6 @@ def run(
     contours = get_contours(image=image)
     features = match_contours(matcher=get_graph_matcher(), contours=contours)
 
-    foo = image.draw(features, show=False)
-    cv2.imwrite("contours.png", foo)
-    assert False
-
     quality_control_image = image.draw(features, show=False)
     cv2.imwrite(str(output_directory / f"QC_{identifier}.png"), quality_control_image)
 
