@@ -151,7 +151,7 @@ def run(
 
     # image.reset_image("resampled")
     image.reset_image("remove_background")
-    image.invert()
+    # image.invert()
 
     output_directory.mkdir(exist_ok=True, parents=True)
 
@@ -178,7 +178,7 @@ def run(
 
         ann = ax.annotate(
             f"Contour {i}",
-            xy=(x0, y1),
+            xy=((x0 + x1)/2, y1),        # (x0, y1)
             size=5,
             color=color,
             arrowprops=dict(

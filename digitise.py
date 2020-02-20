@@ -12,6 +12,7 @@ from pathlib import Path
 
 
 logging.basicConfig(level=os.environ.get("LOGLEVEL", "INFO"))
+
 logger = logging.getLogger(__name__)
 
 

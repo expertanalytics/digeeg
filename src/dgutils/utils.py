@@ -93,15 +93,18 @@ def filter_contours(
 ) -> None:
     """Keep only the pixels inside the contours.
 
-
     `cv2.copyTo` assumes that the background is black, so set `invert` appropriately.
     """
     if len(contours) == 0:
         assert False, "No contours"
 
+    black_count = (image_array == 0).sum()
+    not_black = image_array.size - black_count
+    assert not_black < black_count, "Expecting a black background with white traces"
+
     shape = (m, n) = image_array.shape[:2]
     image_filter = np.zeros(shape, dtype=image_array.dtype)
-    image_filter = cv2.drawContours(image_filter, contours, -2, 255, cv2.FILLED)
+    image_filter = cv2.drawContours(image_filter, contours, -1, 255, cv2.FILLED)
 
     # image.image = cv2.copyTo(image, mask=image_filter)
     foo = np.sum(image_array)

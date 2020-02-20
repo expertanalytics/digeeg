@@ -85,7 +85,7 @@ def run(
 
         ann = ax.annotate(
             f"Contour {i}",
-            xy=(x0, y1),
+            xy=(x1, y1),    # (x0, y1)
             xycoords="data",
             xytext=(0, 35),
             textcoords="offset points",

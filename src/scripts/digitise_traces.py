@@ -1,7 +1,6 @@
 import numpy as np
 import typing as tp
 import matplotlib.pyplot as plt
-import scipy.signal as signal
 
 import os
 import logging
@@ -9,7 +8,6 @@ import argparse
 
 from pathlib import Path
 from dgimage import read_image
-from dgutils import PointAccumulator
 
 
 logging.basicConfig(level=os.environ.get("LOGLEVEL", "INFO"))
@@ -21,41 +19,31 @@ def find_datapoints(
     *,
     image: np.ndarray,
     start_column: int,
-    num_lines: int = 1,
     show: bool = False
-) -> tp.Generator[tp.Tuple[int, float], None, None]:
+) -> tp.Iterator[tp.Tuple[int, float]]:
     """Extract a time series from a segmented line or lines.
 
     Iterate through the image column by column. The column is convolved with a gaussian kernel and the
     peak is used as the "value".
     """
     _image = image
-    window1 = signal.gaussian(50, 15)       # TODO: Expose parameters
-    window1_sum = window1.sum()
-
-    differentiator = PointAccumulator(num_lines=1)      # Restrict to a single line for now
+    assert len(image.shape) == 2, "Expecting 2d image"
 
     for i in range(start_column, _image.shape[1]):
         raw_signal = _image[:, i]
-        filtered_signal = signal.fftconvolve(raw_signal, window1, mode='same')/window1_sum
+        filtered_signal = raw_signal
 
-        peaks = np.sort(signal.find_peaks(
-            filtered_signal,
-            prominence=5,
-            distance=100
-        )[0])       # sort so I can pick the "biggest" peak
+        nonzero_indices = np.where(filtered_signal != 0)[0]
 
-        # Skip column if there are no peaks
-        if len(peaks) == 0:
+        # Check for a blank column
+        if nonzero_indices.size == 0:
             continue
 
-        # TODO: Check extrapolator
-        new_points = differentiator.add_point(i, peaks, look_back=3)
-        logger.debug(new_points)
-
-        # Probably want to move away from generator. Use differentiator always
-        # TODO: Why move away from generator?
-        yield i, new_points[0]      # TODO: How are the poiints sorted?
+        median_nonzero_index = np.argsort(
+            nonzero_indices
+        )[nonzero_indices.size//2]
+        median_index = nonzero_indices[median_nonzero_index]
+        yield i, median_index
 
         # TODO: These images should be stored somewhere for latrer quality review.
         if show:
@@ -64,7 +52,7 @@ def find_datapoints(
             ax2.axvline(i, color="r")
             ax1.plot(raw_signal)
             ax1.plot(filtered_signal, "--")
-            ax1.plot(peaks, filtered_signal[peaks], "x", linewidth=20)
+            ax1.plot(median_index, filtered_signal[median_index], "x", linewidth=20)
             plt.show()
             plt.close(fig)
 
@@ -106,12 +94,16 @@ def run(
     for i, new_y in find_datapoints(
         image=trace_image,
         start_column=start_column,
-        num_lines=0,
         show=show_step
     ):
         y_list.append(new_y)
         x_list.append(i)
-        new_image[int(new_y), i] = 255      # For quality control
+        try:
+            new_image[int(new_y), i] = 255      # For quality control
+        except IndexError as e:
+            logging.info(f"{new_y}, {i}")
+            logging.info(f"{new_image.shape}")
+            import sys; sys.exit(1)
 
     x_arr = np.asarray(x_list, dtype=np.float_)
     y_arr = np.asarray(y_list, dtype=np.float_)
@@ -121,7 +113,9 @@ def run(
 
     # TODO: Save image for later review
     fig, (ax1, ax2) = plt.subplots(2)
+    """
     ax1.imshow(new_image, cmap="gray")
+    """
     ax2.plot(x_arr, y_arr)
     output_directory.mkdir(exist_ok=True, parents=True)
     # fig.savefig(output_directory / f"trace{identifier}_imageQC.png")
@@ -190,7 +184,7 @@ def create_parser() -> argparse.ArgumentParser:
     )
 
     parser.add_argument(
-        "--show_step",
+        "--show-step",
         help="Display peak finding images for quality control",
         action="store_true",
         required=False,
@@ -200,9 +194,11 @@ def create_parser() -> argparse.ArgumentParser:
 
 
 def main() -> None:
+    """Entrypoint."""
     parser = create_parser()
     args = parser.parse_args()
     run(args.input, args.output, args.name, args.scale, args.start, args.show, args.show_step)
+
 
 if __name__ == "__main__":
     main()
