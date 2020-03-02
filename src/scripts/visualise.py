@@ -2,6 +2,8 @@ import numpy as np
 import typing as tp
 import matplotlib.pyplot as plt
 
+from dgutils import compute_bounding_box
+
 import h5py
 import argparse
 import logging
@@ -21,14 +23,14 @@ def analyse(*, data_array: np.ndarray, sampling_frequency: int, out_file: Path =
     Arguments:
         data_array - Array of shape(N, 2). array[:, 0] is treated as time, array[:, 1] is the voltage.
     """
-    fig, (axl, axr) = plt.subplots(ncols=2, figsize=(15, 10))
+    fig, (axu, axb) = plt.subplots(nrows=2, figsize=(15, 10))
 
     time = data_array[:, 0]
     data = data_array[:, 1]
 
-    axl.plot(time, data)
-    axl.set_xlabel("Time")
-    axl.set_ylabel("mV/cm")
+    axu.plot(time, data)
+    axu.set_xlabel("Time")
+    axu.set_ylabel("mV/cm")
 
     frequencies, power_density = welch(
         data,
@@ -39,11 +41,11 @@ def analyse(*, data_array: np.ndarray, sampling_frequency: int, out_file: Path =
         detrend="constant"      # ???
     )
 
-    axr.plot(frequencies, power_density)
-    axr.set_xscale("log")
-    axr.set_yscale("log")
-    axr.set_xlabel("Frequency [Hz]")
-    axr.set_ylabel("Power [dB]")
+    axb.plot(frequencies, power_density)
+    axb.set_xscale("log")
+    axb.set_yscale("log")
+    axb.set_xlabel("Frequency [Hz]")
+    axb.set_ylabel("Power [dB]")
 
     if out_file is not None:
         fig.savefig(out_file)
@@ -117,6 +119,13 @@ def create_parser():
         default=None
     )
 
+    parser.add_argument(
+        "--flip",
+        help="Multiply eeg trace by -1.",
+        action="store_true",
+        required=False
+    )
+
     return parser
 
 
@@ -124,12 +133,23 @@ def main():
     parser = create_parser()
     args = parser.parse_args()
 
-    list_of_data = handle_input_data(args.input)
+    filename_list = [Path(f"trace{number}.npy") for number in args.input]
+    array_of_data = np.asarray(handle_input_data(filename_list))
+
+    for array in array_of_data:     # Why do I need the for-loop? Why not multi dimensional array?
+        array[:, 1] -= array[:, 1].mean()
+        if args.flip:
+            array[:, 1] *= -1
+
+    bounding_boxes = np.asarray([compute_bounding_box(ts) for ts in array_of_data])
+
+    xmin_sorted_indices = np.argsort(bounding_boxes[:, 0])
+    sorted_data = array_of_data[xmin_sorted_indices]
 
     if args.output_dataset is not None:
-        save_arrays(list_of_data, args.output_dataset)
+        save_arrays(sorted_data, args.output_dataset)
 
-    data_array = concatenate_arrays(list_of_data)
+    data_array = concatenate_arrays(sorted_data)
     analyse(data_array=data_array, sampling_frequency=140, out_file=args.output_image)
 
 
