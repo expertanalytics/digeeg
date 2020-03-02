@@ -8,6 +8,8 @@ import logging
 import os
 import sys
 
+import typing as tp
+
 from pathlib import Path
 
 
@@ -21,7 +23,8 @@ def segment_trace(
     session_number: int,
     horisontal_lines: int,
     color_filters: bool,
-    scale: float
+    scale: float,
+    x_interval: tp.Tuple[int, int]
 ) -> Path:
     command = [
         "segment-traces",
@@ -33,6 +36,7 @@ def segment_trace(
 
     if horisontal_lines is not None:
         command += ["--horisontal-kernel-length", str(horisontal_lines)]
+        command += ["--x-interval", str(x_interval[0]), str(x_interval[1])]
 
     if color_filters:
         command += [
@@ -106,6 +110,15 @@ def create_parser() -> argparse.ArgumentParser:
         required=False
     )
 
+    parser.add_argument(
+        "--x-interval",
+        help="The x-interval (height) in which to remove horisontal lines",
+        nargs=2,
+        type=int,
+        required=False,
+        default=None
+    )
+
     return parser
 
 
@@ -113,6 +126,11 @@ def main() -> None:
     parser = create_parser()
     args = parser.parse_args()
     # clean diectory
+
+    if args.remove_horisontal_lines is not None and args.x_interval is None:
+        raise argparse.ArgumentError(
+            "Expecting -interval if horisontal-kernel-length is set"
+        )
 
     scale_path = Path(args.input).parents[0] / "scales.txt"
     scale_dict = {}
@@ -130,7 +148,8 @@ def main() -> None:
         args.session_number,
         args.remove_horisontal_lines,
         args.color_filter,
-        scale_dict[split_number]
+        scale_dict[split_number],
+        args.x_interval
     )
 
     for trace_child in trace_directory.iterdir():
