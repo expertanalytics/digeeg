@@ -27,6 +27,7 @@ setup(
             "plot-trace = scripts.plot_array:main",
             "visualise = scripts.visualise:main",
             "segment-digitise = scripts.segment_digitise:main",
+            "join-traces = scripts.join_traces:main",
         ]
     }
 )

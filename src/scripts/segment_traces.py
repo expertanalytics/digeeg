@@ -95,7 +95,8 @@ def run(
     debug: bool = False,
     blue_color_filter: tp.Sequence[int] = None,
     red_color_filter: tp.Sequence[int] = None,
-    horisontal_kernel_length: int = None
+    horisontal_kernel_length: int = None,
+    x_interval: tp.Tuple[int, int] = None
 ):
     """Remove the background, segment the contours and save the segmented lines as pngs."""
     image = read_image(input_image_path)
@@ -122,12 +123,21 @@ def run(
 
     if horisontal_kernel_length is not None:
         horisontal_kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (horisontal_kernel_length, 1))
-        detected_lines = cv2.morphologyEx(image.image, cv2.MORPH_OPEN, horisontal_kernel, iterations=1)
+
+        x0, x1 = x_interval
+        if x1 == -1:        # Set -1 to be inclusive last element
+            x1 = None
+        detected_lines = cv2.morphologyEx(
+            image.image[x0:x1, :],
+            cv2.MORPH_OPEN,
+            horisontal_kernel,
+            iterations=1
+        )
+
         # findContours returns (contours, hierarchy)
         contours = cv2.findContours(detected_lines, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)[0]
-
         for c in contours:
-            cv2.drawContours(image.image, [c], -1, 0, -10)
+            cv2.drawContours(image.image[x0:x1, :], [c], -1, 0, -10)
 
     remove_background(
         image=image,
@@ -289,12 +299,26 @@ def create_parser() -> argparse.ArgumentParser:
         default=None
     )
 
+    parser.add_argument(
+        "--x-interval",
+        help="The x-interval (height) in which to remove horisontal lines",
+        nargs=2,
+        type=int,
+        required=False,
+        default=None
+    )
+
     return parser
 
 
 def main() -> None:
     parser = create_parser()
     args = parser.parse_args()
+
+    if args.horisontal_kernel_length is not None and args.x_interval is None:
+        raise argparse.ArgumentError(
+            "Expecting -interval if horisontal-kernel-length is set"
+        )
 
     run(
         input_image_path=args.input,
@@ -307,7 +331,8 @@ def main() -> None:
         debug=args.debug,
         horisontal_kernel_length=args.horisontal_kernel_length,
         blue_color_filter=args.blue_color_filter,
-        red_color_filter=args.red_color_filter
+        red_color_filter=args.red_color_filter,
+        x_interval=args.x_interval
     )
 
 

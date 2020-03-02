@@ -36,3 +36,8 @@ from .debug import (
 )
 
 from .point_discriminator import PointAccumulator
+
+from .bounding_box import (
+    sort_bounding_boxes,
+    read_number_of_traces
+)
