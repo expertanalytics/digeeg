@@ -15,5 +15,5 @@ RUN apt-get update && \
     python3 -m pip install --upgrade pip && \
     python3 -m pip install scipy opencv-python numpy shapely matplotlib imutils pylint h5py
 
-RUN cd $HOME && git clone -b js git://github.com/expertanalytics/digeeg && cd digeeg && \
+RUN cd $HOME && git clone -b master git://github.com/expertanalytics/digeeg && cd digeeg && \
     python3 -m pip install -e .
