@@ -113,12 +113,18 @@ def run(
     kernel_length: int = 9,
     num_iterations: int = 4,
     blur_size: int = 9,
-    thresh_val: float = 150,
+    thresh_val: float = 175,
     dx: float = 2.5e-4,
     dy: float = 2.5e-4
 ):
     image = read_image(input_image_path)
-    image_list = split_image(image)
+    image_list = split_image(
+        image,
+        kernel_length=kernel_length,
+        blur_kernel_size=blur_size,
+        threshold_value=thresh_val,
+        num_iterations=num_iterations
+    )
 
     if debug:
         debug_path = get_debug_path("split_image")
@@ -136,13 +142,16 @@ def run(
             num_iterations=num_iterations,
             debug=debug
         )
-
-        axis, scale = get_axis(image, rectangles)
-        image.set_axis(axis)
-        image.set_scale(scale)
-        image.reset_image()
-        resample(image, step_x=dx, step_y=dy)
-        image.checkpoint()
+        if len(rectangles) >= 2:
+            axis, scale = get_axis(image, rectangles)
+            image.set_axis(axis)
+            image.set_scale(scale)
+            image.reset_image()
+            resample(image, step_x=dx, step_y=dy)
+            image.checkpoint()
+        else:
+            print(f"skipping split {i}")
+            continue
 
         if compute_scale:    # Recompute scale
             image.bgr_to_gray()
@@ -154,10 +163,15 @@ def run(
                 num_iterations=num_iterations,
                 debug=debug
             )
-            axis, scale = get_axis(image, rectangles)
-            image.set_axis(axis)
-            image.set_scale(scale)
-            scale_dict[i] = scale
+            if len(rectangles) < 2:
+                logger.info(f"Cannot compute scale of split {i} -- using average of previous scales")
+                if len(scale_dict) > 0:
+                    scale_dict[i] = sum(scale_dict.values()) / len(scale_dict)
+            else:
+                axis, scale = get_axis(image, rectangles)
+                image.set_axis(axis)
+                image.set_scale(scale)
+                scale_dict[i] = scale
 
     output_directory.mkdir(exist_ok=True, parents=True)
 
@@ -236,7 +250,7 @@ def create_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--thresh-val",
         type=float,
-        default=150,
+        default=175,
         help="Apply thresholding to binarise image. Use '-1' for Otsu's binarisation.",
     )
 

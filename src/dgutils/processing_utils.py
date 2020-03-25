@@ -82,8 +82,7 @@ def markers(
 ) -> tp.List[np.ndarray]:
     """Return the contours of the black square markers."""
 
-    # from .plots import plot
-    # plot(image.image)
+    from .plots import plot
     # cv2.imwrite("foo.png", image.image)
     # assert False, image.image.dtype
 
@@ -99,24 +98,33 @@ def markers(
     if debug:
         save(image.image, debug_path, "threshold")
 
-    vertical_kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (1, kernel_length))
-    horisontal_kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (kernel_length, 1))
+    if kernel_length > 0 and num_iterations > 0:
+        vertical_kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (1, kernel_length))
+        horisontal_kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (kernel_length, 1))
 
-    # vertial lines
-    vertical_image = cv2.erode(image.image, vertical_kernel, iterations=num_iterations)
-    cv2.dilate(vertical_image, vertical_kernel, iterations=num_iterations, dst=vertical_image)
+        # vertial lines
+        vertical_image = cv2.erode(image.image, vertical_kernel, iterations=num_iterations)
+        cv2.dilate(vertical_image, vertical_kernel, iterations=num_iterations, dst=vertical_image)
 
-    # Horisontal lines
-    horisontal_image = cv2.erode(image.image, horisontal_kernel, iterations=num_iterations)
-    cv2.dilate(image.image, horisontal_kernel, iterations=num_iterations, dst=vertical_image)
+        # Horisontal lines
+        horisontal_image = cv2.erode(image.image, horisontal_kernel, iterations=num_iterations)
+        cv2.dilate(image.image, horisontal_kernel, iterations=num_iterations, dst=vertical_image)
 
-    # Compute intersection of horisontal and vertical
-    cv2.bitwise_and(horisontal_image, vertical_image, dst=image.image)
+        # Compute intersection of horisontal and vertical
+        cv2.bitwise_and(horisontal_image, vertical_image, dst=image.image)
 
+    contours = get_contours(image=image, min_size=4)
     if debug:
-        save(image.image, debug_path, "morphed")
+        image_draw = Image(image.copy_image())
+        image_draw.gray_to_bgr()
+        image_draw = cv2.drawContours(image_draw.image, contours, -2, (0, 255, 0), 2)
+        save(image_draw, debug_path, "morphed")
 
-    contours = get_contours(image=image)
     features = match_contours(matcher=get_marker_matcher(image=image), contours=contours)
+    if debug:
+        image_draw = Image(image.copy_image())
+        image_draw.gray_to_bgr()
+        image_draw = cv2.drawContours(image_draw.image, features, -2, (0, 0, 255), 2)
+        save(image_draw, debug_path, "features")
     image.reset_image()
     return features

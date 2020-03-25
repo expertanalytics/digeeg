@@ -30,10 +30,7 @@ def get_marker_matcher(
         """Return rectange if it matches a square marker on the paper strip."""
         rectangle = match_rectangle(contour)
 
-        if (rectangle is not None
-                and rectangle_aspect_ratio(rectangle) > marker_min_aspect
-                and cv2.contourArea(rectangle) > marker_min_area
-                and get_contour_mean_value(image, rectangle) < marker_max_value):
+        if (rectangle is not None and cv2.contourArea(rectangle) > marker_min_area):
             return rectangle
 
     return matcher
