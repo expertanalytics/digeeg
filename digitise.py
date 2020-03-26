@@ -187,6 +187,8 @@ def main() -> None:
             scale_dict[split_number]
         )
 
+        if not trace_directory.exists():
+            continue
         for trace_child in trace_directory.iterdir():
             if "annotated" in trace_child.stem:
                 continue
