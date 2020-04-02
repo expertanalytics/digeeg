@@ -28,7 +28,8 @@ def split_image(
             "split-image",
             "-i", str(input_file),
             "-o", outpath,
-            "-n", f"session{session_number}"
+            "-n", f"session{session_number}",
+            "--kernel-length", "0"
         ])
     except subprocess.CalledProcessError as e:
         print(e)
@@ -58,7 +59,10 @@ def segment_trace(
         command += ["--horisontal-kernel-length", "500"]
 
     if color_filters:
-        command += ["--blue-color-filter", "--red-color-filter"]
+        command += [
+            "--blue-color-filter", "90", "10", "10", "255", "90", "90",
+            "--red-color-filter", "10", "10", "90", "90", "90", "255"
+        ]
 
     try:
         subprocess.check_output(command)

@@ -68,14 +68,15 @@ def remove_background(
 
     image.invert()              # We want the main features to be white
     image.blur(smooth_kernel_size)
-    image.threshold(threshold_value)        # Removes most of the milimiter markers
+    # image.threshold(threshold_value)        # Removes most of the milimiter markers
+    image.threshold()        # Otsu binarisation seems to be more robust
 
-    remove_structured_background(
-        image_array=image.image,
-        background_kernel_size=(background_kernel_size, background_kernel_size),
-        smoothing_kernel_size=(smooth_kernel_size, smooth_kernel_size),
-        debug=debug
-    )
+    # remove_structured_background(
+    #     image_array=image.image,
+    #     background_kernel_size=(background_kernel_size, background_kernel_size),
+    #     smoothing_kernel_size=(smooth_kernel_size, smooth_kernel_size),
+    #     debug=debug
+    # )
     if debug:
         save(image.image, debug_path, "output")
 

@@ -74,9 +74,9 @@ def remove_structured_background(
 def markers(
     image: Image,
     *,
-    kernel_length: int = 5,
+    kernel_length: int = 0,
     blur_kernel_size: int = 9,
-    threshold_value: float = 150,
+    threshold_value: float = 175,
     num_iterations: int = 4,
     debug: bool = False
 ) -> tp.List[np.ndarray]:
@@ -114,6 +114,8 @@ def markers(
         cv2.bitwise_and(horisontal_image, vertical_image, dst=image.image)
 
     contours = get_contours(image=image, min_size=4)
+    if  len(contours) == 0:
+        cv2.imwrite("foo.png", image.image)
     if debug:
         image_draw = Image(image.copy_image())
         image_draw.gray_to_bgr()
@@ -125,6 +127,6 @@ def markers(
         image_draw = Image(image.copy_image())
         image_draw.gray_to_bgr()
         image_draw = cv2.drawContours(image_draw.image, features, -2, (0, 0, 255), 2)
-        save(image_draw, debug_path, "features")
+        save(image.image, debug_path, "features")
     image.reset_image()
     return features
