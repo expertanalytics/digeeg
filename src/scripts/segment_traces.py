@@ -317,7 +317,7 @@ def main() -> None:
     args = parser.parse_args()
 
     if args.horisontal_kernel_length is not None and args.x_interval is None:
-        raise argparse.ArgumentError(
+        parser.error(
             "Expecting -interval if horisontal-kernel-length is set"
         )
 

@@ -57,6 +57,7 @@ def segment_trace(
 
     if horisontal_lines:
         command += ["--horisontal-kernel-length", "500"]
+        command += ["--x-interval", "3000", "-1"]
 
     if color_filters:
         command += [
