@@ -33,7 +33,6 @@ def split_image(
         ])
     except subprocess.CalledProcessError as e:
         print(e)
-        sys.exit(1)
     return Path(outpath)
 
 
@@ -69,7 +68,6 @@ def segment_trace(
         subprocess.check_output(command)
     except subprocess.CalledProcessError as e:
         print(e)
-        sys.exit(1)
     return Path(outpath)
 
 
@@ -89,7 +87,6 @@ def digitise_trace(
         ])
     except subprocess.CalledProcessError as e:
         print(e)
-        sys.exit(1)
 
 
 def create_parser() -> argparse.ArgumentParser:
