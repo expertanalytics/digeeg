@@ -1,5 +1,7 @@
 #!/usr/bin/env python
 
+import typing as tp
+
 import subprocess
 import argparse
 import re
@@ -21,7 +23,8 @@ def segment_trace(
     session_number: int,
     horisontal_lines: bool,
     color_filters: bool,
-    scale: float
+    scale: float,
+    x_interval: tp.Tuple[int, int]
 ) -> Path:
     command = [
         "segment-traces",
@@ -33,7 +36,11 @@ def segment_trace(
 
     if horisontal_lines:
         command += ["--horisontal-kernel-length", "500"]
-        command += ["--x-interval", "3000", "-1"]
+        command += ["--x-interval"]
+        if x_interval is None:
+            command += ["3000", "-1"]
+        else:
+            command += [str(x_interval[0]), str(x_interval[1])]
 
     if color_filters:
         command += [
@@ -96,14 +103,23 @@ def create_parser() -> argparse.ArgumentParser:
         help="Height in which to remove horisontal lines.",
         type=int,
         nargs="+",
+        required=False,
+        default=None,
     )
 
     return parser
 
 
+def check_args(args: argparse.Namespace) -> None:
+    """Check the consistency of the arguments."""
+    if args.x_interval is not None and not args.remove_horisontal_lines:
+        raise ValueError("Expected '--remove-horisontal-lines' if '--x-interval' is set.")
+
+
 def main():
     parser = create_parser()
     args = parser.parse_args()
+    check_args(args)
 
     segment_trace(
         args.input,
@@ -111,7 +127,8 @@ def main():
         args.session_number,
         args.remove_horisontal_lines,
         args.color_filter,
-        args.scale
+        args.scale,
+        args.x_interval
     )
 
 

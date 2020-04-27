@@ -1,5 +1,7 @@
 #!/usr/bin/env python
 
+import typing as tp
+
 import subprocess
 import argparse
 import re
@@ -42,7 +44,8 @@ def segment_trace(
     split_number: int,
     horisontal_lines: bool,
     color_filters: bool,
-    scale: float
+    scale: float,
+    x_interval: tp.Tuple[int, int]
 ) -> Path:
     outpath = output_base_directory / f"split{split_number}"
     command = [
@@ -55,7 +58,11 @@ def segment_trace(
 
     if horisontal_lines:
         command += ["--horisontal-kernel-length", "500"]
-        command += ["--x-interval", "3000", "-1"]
+        command += ["--x-interval"]
+        if x_interval is None:
+            command += ["3000", "-1"]
+        else:
+            command += [str(x_interval[0]), str(x_interval[1])]
 
     if color_filters:
         command += [
@@ -133,6 +140,14 @@ def create_parser() -> argparse.ArgumentParser:
     )
 
     parser.add_argument(
+        "--x-interval",
+        nargs="+",
+        help="x-interval in which to apply horisontal line filter",
+        required=False,
+        default=None,
+    )
+
+    parser.add_argument(
         "--color-filter",
         help="Turn on blue and red color filters.",
         action="store_true",
@@ -149,9 +164,17 @@ def create_parser() -> argparse.ArgumentParser:
     return parser
 
 
+def check_args(args: argparse.Namespace) -> None:
+    """Check the consistency of the arguments."""
+    if args.x_interval is not None and not args.remove_horisontal_lines:
+        raise ValueError("Expect '--remove-horisontal-lines' if '--x-interval' is set.")
+
+
 def main() -> None:
     parser = create_parser()
     args = parser.parse_args()
+    print(args)
+    check_args(args)
     # clean diectory
 
     output_base = Path(f"{args.output}{args.patient_id}")
@@ -185,7 +208,8 @@ def main() -> None:
             split_number,
             args.remove_horisontal_lines,
             args.color_filter,
-            scale_dict[split_number]
+            scale_dict[split_number],
+            x_interval
         )
 
         for trace_child in trace_directory.iterdir():
