@@ -1,5 +1,4 @@
-#!/usr/bin/env python
-
+#!/usr/bin/env python 
 import subprocess
 import argparse
 import re
@@ -19,7 +18,7 @@ logger = logging.getLogger(__name__)
 def digitise_trace(
     input_file: Path,
     output_directory: Path,
-    session_number: int,
+    trace_number: int,
     scale: float
 ) -> None:
     try:
@@ -27,7 +26,7 @@ def digitise_trace(
             "digitise-traces",
             "-i", input_file,
             "-o", str(output_directory),
-            "-n", f"{session_number}",
+            "-n", f"{trace_number}",
             "--scale", f"{scale}"
         ])
     except subprocess.CalledProcessError as e:
@@ -41,13 +40,6 @@ def create_parser() -> argparse.ArgumentParser:
         "--input-directory",
         help="Input directory",
         type=Path,
-        required=True,
-    )
-
-    parser.add_argument(
-        "-s",
-        "--session-number",
-        help="The session number within one ECT round or course.",
         required=True,
     )
 
@@ -101,12 +93,12 @@ def main():
         pattern_matches = pattern.findall(str(trace))
         if len(pattern_matches) != 1:
             logger.info("Skipping trace, could not find trace number.")
-        split_number = int(pattern_matches[0])
-        logger.info(f"digitising {trace}")
+        trace_number = int(pattern_matches[0])
+        logger.info(f"digitising trace {trace_number}")
         digitise_trace(
             trace,
             output_directory=args.input_directory,
-            session_number=args.session_number,
+            session_number=trace_number,
             scale=scale
         )
 
