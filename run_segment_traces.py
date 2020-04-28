@@ -60,6 +60,7 @@ def create_parser() -> argparse.ArgumentParser:
         "-i",
         "--input",
         help="Input split image",
+        type=Path,
         required=True,
     )
 
@@ -81,7 +82,8 @@ def create_parser() -> argparse.ArgumentParser:
         "--scale",
         help="Number of pixels per 15 cm.",
         type=float,
-        required=True
+        required=False,
+        default=None
     )
 
     parser.add_argument(
@@ -115,11 +117,38 @@ def check_args(args: argparse.Namespace) -> None:
     if args.x_interval is not None and not args.remove_horisontal_lines:
         raise ValueError("Expected '--remove-horisontal-lines' if '--x-interval' is set.")
 
+def get_scale(args: argparse.Namespace) -> tp.Optional[float]:
+    scale_directory = args.input.parent
+    try:
+        scale_path = (scale_directory / "scales.txt")
+        if not scale_path.exists():
+            logger.error(f"Could not find scale file. Tried to open {scale_path}. Specify scale manually")
+            return None
+        pattern = re.compile("(\d+)")
+        target_id = int(pattern.findall(str(args.input.parts[-1]))[0])
+        with scale_path.open("r") as scale_file:
+            for line in scale_file.readlines():
+                case, scale = line.split(",")
+                if int(case.split(":")[1]) == target_id:
+                    return float(scale.split(":")[1])
+    except IndexError:
+        logger.error("Could not parse scale file. Specify scale manually.")
+        return None
+    return None
+
 
 def main():
     parser = create_parser()
     args = parser.parse_args()
     check_args(args)
+
+    # read scale
+    if args.scale is None:
+        scale = get_scale(args)
+        if scale is None:
+            raise ValueError("Please specify scale manualy")
+    else:
+        scale = args.scale
 
     segment_trace(
         args.input,
@@ -127,7 +156,7 @@ def main():
         args.session_number,
         args.remove_horisontal_lines,
         args.color_filter,
-        args.scale,
+        scale,
         args.x_interval
     )
 

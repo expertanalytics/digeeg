@@ -31,7 +31,7 @@ def digitise_trace(
             "--scale", f"{scale}"
         ])
     except subprocess.CalledProcessError as e:
-        print(e)
+        logger.error(e)
 
 
 def create_parser() -> argparse.ArgumentParser:
@@ -55,15 +55,44 @@ def create_parser() -> argparse.ArgumentParser:
         "--scale",
         help="Number of pixels per 15 cm.",
         type=float,
-        required=True
+        required=False,
+        default=None
     )
 
     return parser
 
 
+def get_scale(args: argparse.Namespace) -> float:
+    scale_directory = args.input_directory.parents[0]
+    try:
+        scale_path = (scale_directory / "scales.txt")
+        if not scale_path.exists():
+            logger.error(f"Could not find scale file. Tried to open {scale_path}. Specify scale manually")
+            return None
+        pattern = re.compile("(\d+)")
+        target_id = int(pattern.findall(str(args.input_directory.parts[-1]))[0])
+        with scale_path.open("r") as scale_file:
+            for line in scale_file.readlines():
+                case, scale = line.split(",")
+                if int(case.split(":")[1]) == target_id:
+                    return float(scale.split(":")[1])
+    except IndexError:
+        logger.error("Could not parse scale file. Specify scale manually.")
+        return None
+    return None
+
+
 def main():
     parser = create_parser()
     args = parser.parse_args()
+
+    # read scale
+    if args.scale is None:
+        scale = get_scale(args)
+        if scale is None:
+            raise ValueError("Please specify scale manualy")
+    else:
+        scale = args.scale
 
     pattern = re.compile("(\d+)\.png")
     for trace in args.input_directory.iterdir():
@@ -78,7 +107,7 @@ def main():
             trace,
             output_directory=args.input_directory,
             session_number=args.session_number,
-            scale=args.scale
+            scale=scale
         )
 
 

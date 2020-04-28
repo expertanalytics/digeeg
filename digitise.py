@@ -33,7 +33,7 @@ def split_image(
             "--kernel-length", "0"
         ])
     except subprocess.CalledProcessError as e:
-        print(e)
+        logger.error(e)
     return Path(outpath)
 
 
@@ -73,7 +73,7 @@ def segment_trace(
     try:
         subprocess.check_output(command)
     except subprocess.CalledProcessError as e:
-        print(e)
+        logger.error(e)
     return Path(outpath)
 
 
@@ -92,7 +92,7 @@ def digitise_trace(
             "--scale", f"{scale}"
         ])
     except subprocess.CalledProcessError as e:
-        print(e)
+        logger.error(e)
 
 
 def create_parser() -> argparse.ArgumentParser:
@@ -173,7 +173,6 @@ def check_args(args: argparse.Namespace) -> None:
 def main() -> None:
     parser = create_parser()
     args = parser.parse_args()
-    print(args)
     check_args(args)
     # clean diectory
 
@@ -209,7 +208,7 @@ def main() -> None:
             args.remove_horisontal_lines,
             args.color_filter,
             scale_dict[split_number],
-            x_interval
+            args.x_interval
         )
 
         for trace_child in trace_directory.iterdir():
