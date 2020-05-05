@@ -158,7 +158,7 @@ def create_parser() -> argparse.ArgumentParser:
         "--clean-directory",
         help="Clean output directory. Use with caution",
         action="store_true",
-        required=True,
+        required=False,
     )
 
     return parser
