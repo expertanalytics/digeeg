@@ -98,7 +98,7 @@ def main():
         digitise_trace(
             trace,
             output_directory=args.input_directory,
-            session_number=trace_number,
+            trace_number=trace_number,
             scale=scale
         )
 
