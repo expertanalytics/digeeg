@@ -130,6 +130,14 @@ def main() -> None:
     parser = create_parser()
     args = parser.parse_args()
 
+    logname = Path(f"log_{args.split_id}{args.eeg_name}")
+    with logname.open("w") as wfh:
+        wfh.write(f"eeg_name: {args.eeg_name}\n")
+        wfh.write(f"flip: {args.flip}\n")
+        wfh.write(f"output_directory: {args.output_directory}\n")
+        wfh.write(f"split_id: {args.split_id}\n")
+        wfh.write(f"traces: {args.traces}\n")
+
     # Array of trace filenames to include
     filename_list = np.asarray([Path(f"trace{number}.npy") for number in args.traces])
 

@@ -17,7 +17,7 @@ def concatenate_arrays(array_list: tp.Iterable[np.ndarray]) -> np.ndarray:
 
 def save_arrays(time_array: np.ndarray, voltage_array: np.ndarray, out_path: Path) -> None:
     """Save list of arrays in as datasets with hdf5."""
-    hdf5_file = h5py.File(str(out_path), "w")
+    hdf5_file = h5py.File(f"{out_path}.h5", "w")
     hdf5_file.create_dataset("time", data=time_array)
     hdf5_file.create_dataset("voltage", data=voltage_array)
     hdf5_file.close()
@@ -107,7 +107,7 @@ def main():
 
     dataset_list = [read_dataset(Path(filename)) for filename in args.eegs]
     time, voltage = join_datasets(dataset_list)
-    out_path = Path(f"{args.name}.h5")
+    out_path = Path(f"{args.name}")
     # save_arrays(time, voltage, out_path)
     save_arrays_numpy(time, voltage, out_path)
 
