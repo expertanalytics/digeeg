@@ -107,10 +107,7 @@ def run(
 
     x_arr = np.asarray(x_list, dtype=np.float_)
     y_arr = np.asarray(y_list, dtype=np.float_)
-
-    # TODO: Why do I do this? This can be done later I think
-    # y_arr -= y_arr.mean()      # mean zero
-    # y_arr *= -1                # flip
+    y_arr -= y_arr.mean()      # mean zero
 
     # TODO: Save image for later review
     fig, (ax1, ax2) = plt.subplots(2)

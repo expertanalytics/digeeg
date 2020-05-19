@@ -34,12 +34,16 @@ def plot_traces(*, data_array: np.ndarray, out_file: Path) -> None:
     plt.close(fig)
 
 
-def save_arrays(array_list: tp.Iterable[np.ndarray], out_file):
+def save_arrays(array_list: tp.Iterable[np.ndarray], out_file) -> None:
     """Save list of arrays in as datasets with hdf5."""
     hdf5_file = h5py.File(str(out_file), "w")
     for i, array in enumerate(array_list):
         hdf5_file.create_dataset(f"series{i}", data=array)
     hdf5_file.close()
+
+
+def save_array_numpy(array: np.ndarray, out_file: Path) -> None:
+    np.save(str(out_file), array)
 
 
 def concatenate_arrays(array_list: tp.Iterable[np.ndarray]) -> np.ndarray:
@@ -138,8 +142,8 @@ def main() -> None:
     if args.flip:
         data_array[:, 1] *= -1
 
-    save_arrays(data_array, args.output_directory / f"eeg_{args.split_id}_{args.eeg_name}.h5")
-    plot_traces(
-        data_array=data_array,
+    # save_arrays(data_array, args.output_directory / f"eeg_{args.split_id}_{args.eeg_name}.h5")
+    save_array_numpy(data_array, args.output_directory / f"eeg_{args.split_id}")     # appends .npy
+    plot_traces(data_array=data_array,
         out_file=args.output_directory / f"eeg_{args.split_id}_{args.eeg_name}.png"
     )

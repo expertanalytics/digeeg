@@ -23,6 +23,13 @@ def save_arrays(time_array: np.ndarray, voltage_array: np.ndarray, out_path: Pat
     hdf5_file.close()
 
 
+def save_arrays_numpy(time: np.ndarray, voltage: np.ndarray, out_file: Path) -> None:
+    array = np.zeros((time.size, 2))
+    array[:, 0] = time
+    array[:, 1] = voltage
+    np.save(str(out_file), array)
+
+
 def _sort_key(key: str) -> int:
     pattern = "(\d+)"
     match = re.search(pattern, key)
@@ -30,23 +37,28 @@ def _sort_key(key: str) -> int:
 
 
 def read_dataset(dataset_path: Path, flip: bool=False) -> tp.Tuple[np.ndarray, np.ndarray]:
-    dts = h5py.File(dataset_path, "r")
-    sorted_keys = sorted(list(dts.keys()), key=_sort_key)
-    tlist = []
-    ylist = []
-    for key in sorted_keys:
-        t, y = dts[key]
-        tlist.append(t)
-        ylist.append(y)
+    if dataset_path.suffix == ".h5":
+        dts = h5py.File(dataset_path, "r")
 
-    y_array = np.asarray(ylist)
-    t_array = np.asarray(tlist)
+        tlist = []
+        ylist = []
 
-    y_array -= y_array.mean()
+        for key in dts.keys():
+            t, y = dts[key]
+            tlist.append(t)
+            ylist.append(y)
 
-    if flip:
-        y_array *= -1
-    return t_array, y_array
+        time_array = np.asarray(tlist)
+        voltage_array = np.asarray(ylist)
+
+        if flip:
+            voltage_array *= -1
+
+        sorted_indices = np.argsort(time_array)
+        return time_array[sorted_indices], voltage_array[sorted_indices]
+    elif dataset_path.suffix == ".npy":
+        array = np.load(str(dataset_path))
+        return array[:, 0], array[:, 1]
 
 
 def join_datasets(
@@ -61,11 +73,9 @@ def join_datasets(
     last_time = time_list[-1][-1]
     for i in range(1, len(dataset_list)):
         time_list.append(dataset_list[i][0][:-140] + last_time)
-        voltages_list.append(dataset_list[i][1][:-140] + last_voltage)
+        voltages_list.append(dataset_list[i][1][:-140])
         last_time = time_list[-1][-1]
         last_voltage = voltages_list[-1][-1]
-
-    time_array = concatenate_arrays(time_list)
 
     time_array = concatenate_arrays(time_list)
     voltage_array = concatenate_arrays(voltages_list)
@@ -98,7 +108,8 @@ def main():
     dataset_list = [read_dataset(Path(filename)) for filename in args.eegs]
     time, voltage = join_datasets(dataset_list)
     out_path = Path(f"{args.name}.h5")
-    save_arrays(time, voltage, out_path)
+    # save_arrays(time, voltage, out_path)
+    save_arrays_numpy(time, voltage, out_path)
 
     fig, ax = plt.subplots(1, figsize=(20, 10))
     ax.plot(time, voltage)
