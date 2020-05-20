@@ -151,7 +151,7 @@ def main() -> None:
         data_array[:, 1] *= -1
 
     # save_arrays(data_array, args.output_directory / f"eeg_{args.split_id}_{args.eeg_name}.h5")
-    save_array_numpy(data_array, args.output_directory / f"eeg_{args.split_id}")     # appends .npy
+    save_array_numpy(data_array, args.output_directory / f"eeg_{args.split_id}_args.eeg_name}")     # appends .npy
     plot_traces(data_array=data_array,
         out_file=args.output_directory / f"eeg_{args.split_id}_{args.eeg_name}.png"
     )
