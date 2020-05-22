@@ -34,8 +34,12 @@ def read_dataset(
     dataset_path: Path,
     flip_time: bool=False,
     flip_voltage: bool=False,
-    max_time: float=15
+    max_time: float=6,
+    voltage_scale: int = 200
 ) -> tp.Tuple[np.ndarray, np.ndarray]:
+    """
+    Voltage scale is measured in micro volts per cm.
+    """
     if dataset_path.suffix == ".h5":
         dts = h5py.File(dataset_path, "r")
 
@@ -59,13 +63,13 @@ def read_dataset(
         _voltage = array[:, 1]
 
     # Compute time scale
-    time_scale = _time.max() / max_time       # TODO: set to 15
+    time_scale = _time.max() / max_time
     _time *= 1/time_scale
 
     # TODO: Check this -- should I normalise
     _voltage -= _voltage.mean()
     _voltage *= 1/time_scale
-    _voltage *= 200     # micro volts
+    _voltage *= voltage_scale     # micro volts
 
     if flip_time:
         _time = _time[::-1]
@@ -102,8 +106,8 @@ def plot_entire_time_series(time, voltage, name):
     fig, ax = plt.subplots(1, figsize=(30, 8), tight_layout=True)
     ax.plot(time, voltage)
 
-    ax.xlabel("time: s")
-    ax.ylabel("voltage $\mu V$")
+    ax.set_xlabel("time: s")
+    ax.set_ylabel("voltage $\mu V$")
     fig.savefig(f"{name}.png")
 
 
@@ -123,6 +127,23 @@ def create_parser() -> argparse.ArgumentParser:
         help="Name of output file. Will create both .h5 and .png",
         required=True
     )
+
+    parser.add_argument(
+        "--voltage-scale",
+        help="micro volts per cm.",
+        required=False,
+        default=200,
+        type=int
+    )
+
+    parser.add_argument(
+        "--max-time",
+        help="seconds per 15 cm",
+        required=False,
+        default=6,
+        type=int
+    )
+
     return parser
 
 
@@ -130,15 +151,19 @@ def main():
     parser = create_parser()
     args = parser.parse_args()
 
-    dataset_list = [read_dataset(Path(filename), max_time=15) for filename in args.eegs]
+    dataset_list = [
+        read_dataset(
+            filename,
+            max_time=args.max_time,
+            voltage_scale=args.voltage_scale
+        ) for filename in args.eegs
+    ]
     time, voltage = join_datasets(dataset_list)
     out_path = Path(f"{args.name}")
     # save_arrays(time, voltage, out_path)
     save_arrays_numpy(time, voltage, out_path)
 
-    fig, ax = plt.subplots(1, figsize=(20, 10))
-    ax.plot(time, voltage)
-    fig.savefig(str(f"{args.name}.png"))
+    plot_entire_time_series(time, voltage, args.name)
     plt.show()
 
 
