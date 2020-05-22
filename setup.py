@@ -28,7 +28,7 @@ setup(
             "visualise = scripts.visualise:main",
             "segment-digitise = scripts.segment_digitise:main",
             "join-traces = scripts.join_traces:main",
-            "check-traces = scripts.join:main",
+            "check-traces = scripts.join2:main",
         ]
     }
 )

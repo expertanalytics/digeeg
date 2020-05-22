@@ -30,13 +30,12 @@ def save_arrays_numpy(time: np.ndarray, voltage: np.ndarray, out_file: Path) -> 
     np.save(str(out_file), array)
 
 
-def _sort_key(key: str) -> int:
-    pattern = "(\d+)"
-    match = re.search(pattern, key)
-    return int(match.group())
-
-
-def read_dataset(dataset_path: Path, flip: bool=False) -> tp.Tuple[np.ndarray, np.ndarray]:
+def read_dataset(
+    dataset_path: Path,
+    flip_time: bool=False,
+    flip_voltage: bool=False,
+    max_time: float=15
+) -> tp.Tuple[np.ndarray, np.ndarray]:
     if dataset_path.suffix == ".h5":
         dts = h5py.File(dataset_path, "r")
 
@@ -51,14 +50,28 @@ def read_dataset(dataset_path: Path, flip: bool=False) -> tp.Tuple[np.ndarray, n
         time_array = np.asarray(tlist)
         voltage_array = np.asarray(ylist)
 
-        if flip:
-            voltage_array *= -1
-
         sorted_indices = np.argsort(time_array)
-        return time_array[sorted_indices], voltage_array[sorted_indices]
+        _time = time_array[sorted_indices]
+        _voltage = voltage_array[sorted_indices]
     elif dataset_path.suffix == ".npy":
         array = np.load(str(dataset_path))
-        return array[:, 0], array[:, 1]
+        _time = array[:, 0]
+        _voltage = array[:, 1]
+
+    # Compute time scale
+    time_scale = _time.max() / max_time       # TODO: set to 15
+    _time *= 1/time_scale
+
+    # TODO: Check this -- should I normalise
+    _voltage -= _voltage.mean()
+    _voltage *= 1/time_scale
+    _voltage *= 200     # micro volts
+
+    if flip_time:
+        _time = _time[::-1]
+    if flip_voltage:
+        _voltage *= -1
+    return _time, _voltage
 
 
 def join_datasets(
@@ -73,6 +86,8 @@ def join_datasets(
     last_time = time_list[-1][-1]
     for i in range(1, len(dataset_list)):
         time_list.append(dataset_list[i][0][:-140] + last_time)
+
+        # TODO: Skal jeg legge til noe (last_voltage?) her?
         voltages_list.append(dataset_list[i][1][:-140])
         last_time = time_list[-1][-1]
         last_voltage = voltages_list[-1][-1]
@@ -80,6 +95,16 @@ def join_datasets(
     time_array = concatenate_arrays(time_list)
     voltage_array = concatenate_arrays(voltages_list)
     return time_array, voltage_array
+
+
+def plot_entire_time_series(time, voltage, name):
+    # TODO: set dynamic fig size
+    fig, ax = plt.subplots(1, figsize=(30, 8), tight_layout=True)
+    ax.plot(time, voltage)
+
+    ax.xlabel("time: s")
+    ax.ylabel("voltage $\mu V$")
+    fig.savefig(f"{name}.png")
 
 
 def create_parser() -> argparse.ArgumentParser:
@@ -105,7 +130,7 @@ def main():
     parser = create_parser()
     args = parser.parse_args()
 
-    dataset_list = [read_dataset(Path(filename)) for filename in args.eegs]
+    dataset_list = [read_dataset(Path(filename), max_time=15) for filename in args.eegs]
     time, voltage = join_datasets(dataset_list)
     out_path = Path(f"{args.name}")
     # save_arrays(time, voltage, out_path)
