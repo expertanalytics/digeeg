@@ -76,7 +76,7 @@ def read_dataset(
     _voltage *= voltage_scale     # micro volts
 
     if flip_time:
-        _time = _time[::-1]
+        _voltgate = _voltage[::-1]      # time-axis stays the same. It is just an axis
     if flip_voltage:
         _voltage *= -1
     return _time, _voltage
@@ -90,15 +90,11 @@ def join_datasets(
 
     time_list.append(dataset_list[0][0])
     voltages_list.append(dataset_list[0][1])
-    last_voltage = voltages_list[-1][-1]
     last_time = time_list[-1][-1]
     for i in range(1, len(dataset_list)):
         time_list.append(dataset_list[i][0][:-140] + last_time)
-
-        # TODO: Skal jeg legge til noe (last_voltage?) her?
         voltages_list.append(dataset_list[i][1][:-140])
         last_time = time_list[-1][-1]
-        last_voltage = voltages_list[-1][-1]
 
     time_array = concatenate_arrays(time_list)
     voltage_array = concatenate_arrays(voltages_list)
