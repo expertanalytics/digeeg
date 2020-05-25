@@ -61,6 +61,10 @@ def read_dataset(
         array = np.load(str(dataset_path))
         _time = array[:, 0]
         _voltage = array[:, 1]
+    else:
+        raise ValueError(
+            f"Unknown file extension, got {dataset_path.suffix}, expecting '.npy' or '.h5'"
+        )
 
     # Compute time scale
     time_scale = _time.max() / max_time
@@ -116,7 +120,7 @@ def create_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "-i",
         "--eegs", help="Paths to eegs to join together. Expecting .h5-files.",
-        type=Path,
+        type=int,
         nargs="+",
         required=True
     )
@@ -144,19 +148,89 @@ def create_parser() -> argparse.ArgumentParser:
         type=int
     )
 
+    parser.add_argument(
+        "--lower",
+        help="Look for eegs from the 'lower' trace.",
+        action="store_true",
+        required=False,
+    )
+
+    parser.add_argument(
+        "--upper",
+        help="Look for eegs from the 'upper' trace.",
+        action="store_true",
+        required=False,
+    )
+
+    parser.add_argument(
+        "--flip-time",
+        help="reverse the time-axis",
+        action="store_true",
+        required=False
+    )
+
+    parser.add_argument(
+        "--flip-voltage",
+        help="reverse the time-axis",
+        action="store_true",
+        required=False
+    )
+
     return parser
+
+
+def _validate_arguments(arguments: tp.Any) -> None:
+    if arguments.upper and arguments.lower:
+        raise ValueError("only one of 'upper' or 'lower' can be set")
+    if not arguments.upper and not arguments.lower:
+        raise ValueError("One of 'upper' or 'lower' must be set")
+
+
+def _get_flag(arguments: tp.Any) -> str:
+    eeg_flag: str
+    if arguments.upper:
+        eeg_flag = "upper"
+    elif arguments.lower:
+        eeg_flag = "lower"
+    return eeg_flag
+
+
+def parse_filenames(id_list: tp.Iterable[int], eeg_flag: str) -> tp.List[Path]:
+    """NB! only works in current working directory. EEG-flag is either alower or upper"""
+    # Look for all files matching "eeg_{:d}_{eeg_flag}."
+    p = Path(".")
+    file_list = []
+    for i in id_list:
+        file_glob = list(filter(lambda x: x.suffix != ".png", p.glob(f"eeg_{i}_{eeg_flag}.*")))     # passed to multiple generators
+        if len(file_glob) == 0:
+            raise ValueError(f"No matching files found. Looking for 'eeg_{i}_{eeg_flag}.*'")
+        if len(file_list) > 1:
+            raise ValueError(f"Multiple EEGs found, please move all but one. Found {file_list}.")
+        file_list.append(file_glob[0])
+    suffixes = set(map(lambda x: x.suffix, file_list))
+    if len(suffixes) != 1:
+        raise UserWarning(
+            f"Multiple suffixes found in the EEG file list. Is this right? Found {suffixes}"
+        )
+    return file_list
 
 
 def main():
     parser = create_parser()
     args = parser.parse_args()
+    _validate_arguments(args)
+
+    eeg_flag = _get_flag(args)
+    filename_list = parse_filenames(args.eegs, eeg_flag)
 
     dataset_list = [
         read_dataset(
             filename,
             max_time=args.max_time,
-            voltage_scale=args.voltage_scale
-        ) for filename in args.eegs
+            voltage_scale=args.voltage_scale,
+            flip_time=args.flip_time,
+            flip_voltage=args.flip_voltage,
+        ) for filename in filename_list
     ]
     time, voltage = join_datasets(dataset_list)
     out_path = Path(f"{args.name}")
