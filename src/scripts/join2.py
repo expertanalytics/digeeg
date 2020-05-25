@@ -120,8 +120,8 @@ def parse_filenames(id_list: tp.Iterable[int], eeg_flag: str) -> tp.List[Path]:
         file_glob = list(filter(lambda x: x.suffix != ".png", p.glob(f"eeg_{i}_{eeg_flag}.*")))     # passed to multiple generators
         if len(file_glob) == 0:
             raise ValueError(f"No matching files found. Looking for 'eeg_{i}_{eeg_flag}.*'")
-        if len(file_list) > 1:
-            raise ValueError(f"Multiple EEGs found, please move all but one. Found {file_list}.")
+        if len(file_glob) > 1:
+            raise ValueError(f"Multiple EEGs found, please move all but one. Found {file_glob}.")
         file_list.append(file_glob[0])
     suffixes = set(map(lambda x: x.suffix, file_list))
     if len(suffixes) != 1:
