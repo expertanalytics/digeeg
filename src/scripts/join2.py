@@ -115,6 +115,26 @@ def plot_entire_time_series(time, voltage, name):
     fig.savefig(f"{name}.png")
 
 
+def parse_filenames(id_list: tp.Iterable[int], eeg_flag: str) -> tp.List[Path]:
+    """NB! only works in current working directory. EEG-flag is either alower or upper"""
+    # Look for all files matching "eeg_{:d}_{eeg_flag}."
+    p = Path(".")
+    file_list = []
+    for i in id_list:
+        file_glob = list(filter(lambda x: x.suffix != ".png", p.glob(f"eeg_{i}_{eeg_flag}.*")))     # passed to multiple generators
+        if len(file_glob) == 0:
+            raise ValueError(f"No matching files found. Looking for 'eeg_{i}_{eeg_flag}.*'")
+        if len(file_list) > 1:
+            raise ValueError(f"Multiple EEGs found, please move all but one. Found {file_list}.")
+        file_list.append(file_glob[0])
+    suffixes = set(map(lambda x: x.suffix, file_list))
+    if len(suffixes) != 1:
+        raise UserWarning(
+            f"Multiple suffixes found in the EEG file list. Is this right? Found {suffixes}"
+        )
+    return file_list
+
+
 def create_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser()
     parser.add_argument(
@@ -171,7 +191,7 @@ def create_parser() -> argparse.ArgumentParser:
 
     parser.add_argument(
         "--flip-voltage",
-        help="reverse the time-axis",
+        help="Invert the voltage",
         action="store_true",
         required=False
     )
@@ -193,26 +213,6 @@ def _get_flag(arguments: tp.Any) -> str:
     elif arguments.lower:
         eeg_flag = "lower"
     return eeg_flag
-
-
-def parse_filenames(id_list: tp.Iterable[int], eeg_flag: str) -> tp.List[Path]:
-    """NB! only works in current working directory. EEG-flag is either alower or upper"""
-    # Look for all files matching "eeg_{:d}_{eeg_flag}."
-    p = Path(".")
-    file_list = []
-    for i in id_list:
-        file_glob = list(filter(lambda x: x.suffix != ".png", p.glob(f"eeg_{i}_{eeg_flag}.*")))     # passed to multiple generators
-        if len(file_glob) == 0:
-            raise ValueError(f"No matching files found. Looking for 'eeg_{i}_{eeg_flag}.*'")
-        if len(file_list) > 1:
-            raise ValueError(f"Multiple EEGs found, please move all but one. Found {file_list}.")
-        file_list.append(file_glob[0])
-    suffixes = set(map(lambda x: x.suffix, file_list))
-    if len(suffixes) != 1:
-        raise UserWarning(
-            f"Multiple suffixes found in the EEG file list. Is this right? Found {suffixes}"
-        )
-    return file_list
 
 
 def main():
