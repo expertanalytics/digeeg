@@ -21,13 +21,13 @@ from dgutils import (
 
 
 def plot_traces(*, data_array: np.ndarray, out_file: Path) -> None:
-    fig, ax = plt.subplots(figsize=(10, 5))
+    fig, ax = plt.subplots(figsize=(20, 8))
     time = data_array[:, 0]
     data = data_array[:, 1]
 
     ax.plot(time, data)
     ax.set_xlabel("Time [s]")
-    ax.set_ylabel("mV/cm")
+    ax.set_ylabel("$\mu V$")
 
     if out_file is not None:
         fig.savefig(str(out_file))

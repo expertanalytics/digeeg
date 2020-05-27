@@ -103,7 +103,7 @@ def join_datasets(
 
 def plot_entire_time_series(time, voltage, name):
     # TODO: set dynamic fig size
-    fig, ax = plt.subplots(1, figsize=(30, 8), tight_layout=True)
+    fig, ax = plt.subplots(1, figsize=(40, 8), tight_layout=True)
     ax.plot(time, voltage)
 
     ax.set_xlabel("time: s")
@@ -229,8 +229,11 @@ def main():
         ) for filename in filename_list
     ]
     time, voltage = join_datasets(dataset_list)
-    out_path = Path(f"{args.name}")
-    # save_arrays(time, voltage, out_path)
+
+    if args.upper:
+        out_path = Path(f"{args.name}_upper")
+    else:       # upper/lower exclusivity checked validate_arguments
+        out_path = Path(f"{args.name}_lower")
     save_arrays_numpy(time, voltage, out_path)
 
     plot_entire_time_series(time, voltage, args.name)
