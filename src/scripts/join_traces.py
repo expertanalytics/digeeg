@@ -70,9 +70,9 @@ def scale_arrays(
     Voltage scale is micro V / cm.,
     """
     time_scale = data_array[:, 0].max()/max_time
-    data_array /= time_scale
+    data_array[:, 0] /= time_scale
 
-    data_array -= data_array[:, 1].mean()
+    data_array[:, 1] -= data_array[:, 1].mean()
     data_array[:, 1] *= voltage_scale
 
     if flip_time:
@@ -159,7 +159,7 @@ def create_parser() -> argparse.ArgumentParser:
 
     parser.add_argument(
         "--voltage-scale",
-        help="micro volts per cm.",
+        help="micro volts per cm. Defaults to 200.",
         required=False,
         default=200,
         type=int
@@ -167,7 +167,7 @@ def create_parser() -> argparse.ArgumentParser:
 
     parser.add_argument(
         "--max-time",
-        help="seconds per 15 cm",
+        help="seconds per 15 cm. Defaults to 6 seconds.",
         required=False,
         default=6,
         type=int
