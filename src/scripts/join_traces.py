@@ -21,7 +21,7 @@ from dgutils import (
 
 
 def plot_traces(*, data_array: np.ndarray, out_file: Path) -> None:
-    fig, ax = plt.subplots()
+    fig, ax = plt.subplots(figsize=(10, 5))
     time = data_array[:, 0]
     data = data_array[:, 1]
 
@@ -52,6 +52,33 @@ def concatenate_arrays(array_list: tp.Iterable[np.ndarray]) -> np.ndarray:
 
 def read_arrays(filename_list: tp.Iterable[Path]) -> tp.List[np.ndarray]:
     return list(map(np.load, filename_list))
+
+
+def scale_arrays(
+    data_array: np.ndarray,
+    flip_time: bool,
+    flip_voltage: bool,
+    max_time:float=6,
+    voltage_scale: int = 200
+) -> np.ndarray:
+    """
+    time is data_array[:, 0].
+    time is data_array[:, 1].
+
+    NB! Operates in place.
+
+    Voltage scale is micro V / cm.,
+    """
+    time_scale = data_array[:, 0].max()/max_time
+    data_array /= time_scale
+
+    data_array -= data_array[:, 1].mean()
+    data_array[:, 1] *= voltage_scale
+
+    if flip_time:
+        data_array[:, 1] = data_array[:, 1][::-1]
+    if flip_voltage:
+        data_array[:, 1] *= -1
 
 
 def read_dataset(filename: Path) -> tp.List[np.ndarray]:
@@ -117,10 +144,33 @@ def create_parser() -> argparse.ArgumentParser:
     )
 
     parser.add_argument(
-        "--flip",
-        help="Multiply eeg trace by -1.",
+        "--flip-voltage",
+        help="Multiply voltage by -1.",
         action="store_true",
         required=False
+    )
+
+    parser.add_argument(
+        "--flip-time",
+        help="reverse the time-axis",
+        action="store_true",
+        required=False
+    )
+
+    parser.add_argument(
+        "--voltage-scale",
+        help="micro volts per cm.",
+        required=False,
+        default=200,
+        type=int
+    )
+
+    parser.add_argument(
+        "--max-time",
+        help="seconds per 15 cm",
+        required=False,
+        default=6,
+        type=int
     )
 
     return parser
@@ -133,7 +183,10 @@ def main() -> None:
     logname = Path(f"log_{args.split_id}{args.eeg_name}")
     with logname.open("w") as wfh:
         wfh.write(f"eeg_name: {args.eeg_name}\n")
-        wfh.write(f"flip: {args.flip}\n")
+        wfh.write(f"flip_time: {args.flip_time}\n")
+        wfh.write(f"flip_voltage: {args.flip_voltage}\n")
+        wfh.write(f"max_time: {args.max_time}\n")
+        wfh.write(f"voltsage_scale: {args.voltage_scale}\n")
         wfh.write(f"output_directory: {args.output_directory}\n")
         wfh.write(f"split_id: {args.split_id}\n")
         wfh.write(f"traces: {args.traces}\n")
@@ -146,9 +199,13 @@ def main() -> None:
 
     # Concatenate the arrays
     data_array = concatenate_arrays(list_of_arrays)
-
-    if args.flip:
-        data_array[:, 1] *= -1
+    scale_arrays(
+        data_array=data_array,
+        flip_time=args.flip_time,
+        flip_voltage=args.flip_voltage,
+        max_time=args.max_time,
+        voltage_scale=args.voltage_scale
+    )
 
     # save_arrays(data_array, args.output_directory / f"eeg_{args.split_id}_{args.eeg_name}.h5")
     save_array_numpy(data_array, args.output_directory / f"eeg_{args.split_id}_{args.eeg_name}")     # appends .npy
