@@ -35,7 +35,7 @@ def read_dataset(
     flip_time: bool=False,
     flip_voltage: bool=False,
     max_time: float=6,
-    voltage_scale: int = 200
+    voltage_scale: int = 1
 ) -> tp.Tuple[np.ndarray, np.ndarray]:
     """
     Voltage scale is measured in micro volts per cm.
@@ -152,7 +152,7 @@ def create_parser() -> argparse.ArgumentParser:
         "--voltage-scale",
         help="micro volts per cm.",
         required=False,
-        default=200,
+        default=1,
         type=int
     )
 
