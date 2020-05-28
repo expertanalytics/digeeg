@@ -40,6 +40,14 @@ def read_dataset(
     """
     Voltage scale is measured in micro volts per cm.
     """
+
+    pattern = re.compile("eeg_(\d+)_")
+    split_number_matches = pattern.findall(str(dataset_path))
+
+    if not len(split_number_matches) == 1:
+        raise ValueError(f"could not parse file name {dataset_path}")
+    split_number = int(split_number_matches[0])
+
     if dataset_path.suffix == ".h5":
         dts = h5py.File(dataset_path, "r")
 
@@ -75,10 +83,15 @@ def read_dataset(
     _voltage *= 1/time_scale
     _voltage *= voltage_scale     # micro volts
 
+    # Add multipe of max_time based on filename (split number)
+
     if flip_time:
         _voltgate = _voltage[::-1]      # time-axis stays the same. It is just an axis
     if flip_voltage:
         _voltage *= -1
+
+    # Add max_time times split number to account for gaps in the data
+    _time += split_number*max_time
     return _time, _voltage
 
 
@@ -92,7 +105,8 @@ def join_datasets(
     voltages_list.append(dataset_list[0][1])
     last_time = time_list[-1][-1]
     for i in range(1, len(dataset_list)):
-        time_list.append(dataset_list[i][0][:-140] + last_time)
+        # time_list.append(dataset_list[i][0][:-140] + last_time)
+        time_list.append(dataset_list[i][0][:-140])
         voltages_list.append(dataset_list[i][1][:-140])
         last_time = time_list[-1][-1]
 
