@@ -102,22 +102,24 @@ def handle_input_data(filename_list: tp.Iterable[Path]) -> tp.List[np.ndarray]:
     return list_of_data
 
 
-class CheckNameAction(argparse.Action):
-    def __call__(self, parser, namespace, values, option_string=None):
-        if values not in {"upper", "lower"}:
-            msg = "Invalid EEG name. Expecting 'upper' or 'lower'"
-            raise ValueError(msg)
-        setattr(namespace, self.dest, values)
-
-
 def create_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser("Join EEG traces together")
     parser.add_argument(
-        "--traces",
+        "--upper",
         nargs="+",
         help="List of EEG trace ids to exclude. Filenames are 'trace{d:}.npy'",
         type=int,
-        required=True
+        required=False,
+        default=None
+    )
+
+    parser.add_argument(
+        "--lower",
+        nargs="+",
+        help="List of EEG trace ids to exclude. Filenames are 'trace{d:}.npy'",
+        type=int,
+        required=False,
+        default=None
     )
 
     parser.add_argument(
@@ -132,15 +134,6 @@ def create_parser() -> argparse.ArgumentParser:
         help="String to identify the split within the trace",
         type=int,
         required=True
-    )
-
-    parser.add_argument(
-        "-n",
-        "--eeg-name",
-        help="EEG name, either 'upper' or 'lower'",
-        type=str,
-        required=True,
-        action=CheckNameAction
     )
 
     parser.add_argument(
@@ -176,23 +169,18 @@ def create_parser() -> argparse.ArgumentParser:
     return parser
 
 
-def main() -> None:
-    parser = create_parser()
-    args = parser.parse_args()
-
-    logname = Path(f"log_{args.split_id}{args.eeg_name}")
-    with logname.open("w") as wfh:
-        wfh.write(f"eeg_name: {args.eeg_name}\n")
-        wfh.write(f"flip_time: {args.flip_time}\n")
-        wfh.write(f"flip_voltage: {args.flip_voltage}\n")
-        wfh.write(f"max_time: {args.max_time}\n")
-        wfh.write(f"voltsage_scale: {args.voltage_scale}\n")
-        wfh.write(f"output_directory: {args.output_directory}\n")
-        wfh.write(f"split_id: {args.split_id}\n")
-        wfh.write(f"traces: {args.traces}\n")
-
+def _join_traces(
+    traces: tp.List[int],
+    output_directory: Path,
+    eeg_name: str,
+    split_id: int,
+    flip_time: bool,
+    flip_voltage: bool,
+    max_time: float,
+    voltage_scale: float,
+) -> None:
     # Array of trace filenames to include
-    filename_list = np.asarray([Path(f"trace{number}.npy") for number in args.traces])
+    filename_list = np.asarray([Path(f"trace{number}.npy") for number in traces])
 
     # Array of time series
     list_of_arrays = np.asarray(handle_input_data(filename_list))
@@ -201,14 +189,69 @@ def main() -> None:
     data_array = concatenate_arrays(list_of_arrays)
     scale_arrays(
         data_array=data_array,
-        flip_time=args.flip_time,
-        flip_voltage=args.flip_voltage,
-        max_time=args.max_time,
-        voltage_scale=args.voltage_scale
+        flip_time=flip_time,
+        flip_voltage=flip_voltage,
+        max_time=max_time,
+        voltage_scale=voltage_scale
     )
 
     # save_arrays(data_array, args.output_directory / f"eeg_{args.split_id}_{args.eeg_name}.h5")
-    save_array_numpy(data_array, args.output_directory / f"eeg_{args.split_id}_{args.eeg_name}")     # appends .npy
+    save_array_numpy(data_array, output_directory / f"eeg_{split_id}_{eeg_name}")     # appends .npy
     plot_traces(data_array=data_array,
-        out_file=args.output_directory / f"eeg_{args.split_id}_{args.eeg_name}.png"
+        out_file=output_directory / f"eeg_{split_id}_{eeg_name}.png"
     )
+
+
+def main() -> None:
+    parser = create_parser()
+    args = parser.parse_args()
+
+    logname = Path(f"log_{args.split_id}")
+    with logname.open("w") as wfh:
+        wfh.write(f"flip_time: {args.flip_time}\n")
+        wfh.write(f"flip_voltage: {args.flip_voltage}\n")
+        wfh.write(f"max_time: {args.max_time}\n")
+        wfh.write(f"voltsage_scale: {args.voltage_scale}\n")
+        wfh.write(f"output_directory: {args.output_directory}\n")
+        wfh.write(f"split_id: {args.split_id}\n")
+        wfh.write(f"upper: {args.upper}\n")
+        wfh.write(f"lower: {args.lower}\n")
+
+    upper = set()
+    if args.upper is None:
+        logger.info("Skipping upper eeg. No traces supplied")
+    else:
+        upper = set(args.upper)
+
+    lower = set()
+    if args.lower is None:
+        logger.info("Skipping upper eeg. No traces supplied")
+    else:
+        lower = set(args.lower)
+
+    intersection = upper & lower
+    if intersection == set():
+        if len(upper) > 0:
+            _join_traces(
+                args.upper,
+                args.output_directory,
+                "upper",
+                args.split_id,
+                args.flip_time,
+                args.flip_voltage,
+                args.max_time,
+                args.voltage_scale
+            )
+        if len(lower) > 0:
+            _join_traces(
+                args.lower,
+                args.output_directory,
+                "lower",
+                args.split_id,
+                args.flip_time,
+                args.flip_voltage,
+                args.max_time,
+                args.voltage_scale
+            )
+    else:
+        raise ValueError(f"Traces {intersection} supplied to both upper and lower")

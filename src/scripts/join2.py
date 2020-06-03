@@ -115,14 +115,14 @@ def join_datasets(
     return time_array, voltage_array
 
 
-def plot_entire_time_series(time, voltage, name):
+def plot_entire_time_series(time, voltage, name, eeg_flag):
     # TODO: set dynamic fig size
-    fig, ax = plt.subplots(1, figsize=(40, 8), tight_layout=True)
+    fig, ax = plt.subplots(1, figsize=(50, 8), tight_layout=True)
     ax.plot(time, voltage)
 
     ax.set_xlabel("time: s")
     ax.set_ylabel("voltage $\mu V$")
-    fig.savefig(f"{name}.png")
+    fig.savefig(f"{name}_{eeg_flag}.png")
 
 
 def parse_filenames(id_list: tp.Iterable[int], eeg_flag: str) -> tp.List[Path]:
@@ -149,7 +149,7 @@ def create_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser()
     parser.add_argument(
         "-i",
-        "--eegs", help="Paths to eegs to join together. Expecting .h5-files.",
+        "--eegs", help="Paths to eegs to join together. Expecting .h5-files xor .npy-files.",
         type=int,
         nargs="+",
         required=True
@@ -250,7 +250,7 @@ def main():
         out_path = Path(f"{args.name}_lower")
     save_arrays_numpy(time, voltage, out_path)
 
-    plot_entire_time_series(time, voltage, args.name)
+    plot_entire_time_series(time, voltage, args.name, eeg_flag)
     plt.show()
 
 
