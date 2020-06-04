@@ -43,7 +43,6 @@ def read_dataset(
     dataset_path: Path,
     flip_time: bool=False,
     flip_voltage: bool=False,
-    max_time: float=6,
     voltage_scale: int = 1
 ) -> tp.Tuple[np.ndarray, np.ndarray]:
     """
@@ -77,22 +76,14 @@ def read_dataset(
             f"Unknown file extension, got {dataset_path.suffix}, expecting '.npy' or '.h5'"
         )
 
-    # Compute time scale
-    time_scale = _time.max() / max_time
-
-    # TODO: Check this -- should I normalise
-    _voltage -= _voltage.mean()
+    _voltage -= _voltage.mean()   # I have no information of a zero level anyway
     _voltage *= voltage_scale     # micro volts
-
-    # Add multipe of max_time based on filename (split number)
 
     if flip_time:
         _voltgate = _voltage[::-1]      # time-axis stays the same. It is just an axis
     if flip_voltage:
         _voltage *= -1
 
-    # Add max_time times split number to account for gaps in the data
-    _time += split_number*max_time
     return _time, _voltage
 
 
@@ -117,10 +108,14 @@ def join_datasets(
         time_difference = 0
         split_number_diff = split_number_list[i] - split_number_list[i - 1]
         if split_number_diff > 1:
-            time_difference = max_time*(split_number_diff - 1)      # TODO: is -1 correct?
+            time_difference = max_time*(split_number_diff - 1)
             assert False, time_difference
 
-        time_list.append(dataset_list[i][0][:-overlap] + time_difference)
+        # if the start time of the time series is specified
+        if dataset_list[i][0][0] > last_time:
+            last_time = 0
+
+        time_list.append(dataset_list[i][0][:-overlap] + time_difference + last_time)
         voltages_list.append(dataset_list[i][1][:-overlap])
         last_time = time_list[-1][-1]
 
@@ -264,7 +259,6 @@ def main():
     dataset_list = [
         read_dataset(
             filename,
-            max_time=args.max_time,
             voltage_scale=args.voltage_scale,
             flip_time=args.flip_time,
             flip_voltage=args.flip_voltage,
