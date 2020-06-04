@@ -58,7 +58,8 @@ def scale_arrays(
     data_array: np.ndarray,
     flip_time: bool,
     flip_voltage: bool,
-    max_time:float=6,
+    start_time: float,
+    stop_time: float,
     voltage_scale: int = 200
 ) -> np.ndarray:
     """
@@ -69,8 +70,11 @@ def scale_arrays(
 
     Voltage scale is micro V / cm.,
     """
-    time_scale = data_array[:, 0].max()/max_time
-    data_array[:, 0] /= time_scale
+
+    time_duration = stop_time - start_time
+    time_scale = data_array[:, 0].max()/time_duration
+    data_array[:, 0] /= time_scale      # time interval is now (0, time_duration)
+    data_array[:, 0] += start_time      # time interval is not (start_time, stop_time)
 
     data_array[:, 1] -= data_array[:, 1].mean()
     data_array[:, 1] *= voltage_scale
@@ -166,7 +170,15 @@ def create_parser() -> argparse.ArgumentParser:
     )
 
     parser.add_argument(
-        "--max-time",
+        "--start-time",
+        help="seconds per 15 cm. Defaults to 6 seconds.",
+        required=False,
+        default=0,
+        type=float
+    )
+
+    parser.add_argument(
+        "--stop-time",
         help="seconds per 15 cm. Defaults to 6 seconds.",
         required=False,
         default=6,
@@ -183,7 +195,8 @@ def _join_traces(
     split_id: int,
     flip_time: bool,
     flip_voltage: bool,
-    max_time: float,
+    start_time: float,
+    stop_time: float,
     voltage_scale: float,
 ) -> None:
     # Array of trace filenames to include
@@ -198,7 +211,8 @@ def _join_traces(
         data_array=data_array,
         flip_time=flip_time,
         flip_voltage=flip_voltage,
-        max_time=max_time,
+        start_time=start_time,
+        stop_time=stop_time,
         voltage_scale=voltage_scale
     )
 
@@ -209,6 +223,11 @@ def _join_traces(
     )
 
 
+def _validate_args(args: tp.Any) -> None:
+    if args.start_time >= args.stop_time:
+        raise ValueError("Start time ({args.start_time}) >= stop time ({args.stop_time}).")
+
+
 def main() -> None:
     parser = create_parser()
     args = parser.parse_args()
@@ -217,7 +236,8 @@ def main() -> None:
     with logname.open("w") as wfh:
         wfh.write(f"flip_time: {args.flip_time}\n")
         wfh.write(f"flip_voltage: {args.flip_voltage}\n")
-        wfh.write(f"max_time: {args.max_time}\n")
+        wfh.write(f"start_time: {args.start_time}\n")
+        wfh.write(f"stop_time: {args.stop_time}\n")
         wfh.write(f"voltsage_scale: {args.voltage_scale}\n")
         wfh.write(f"output_directory: {args.output_directory}\n")
         wfh.write(f"split_id: {args.split_id}\n")
@@ -246,7 +266,8 @@ def main() -> None:
                 args.split_id,
                 args.flip_time,
                 args.flip_voltage,
-                args.max_time,
+                args.start_time,
+                args.stop_time,
                 args.voltage_scale
             )
         if len(lower) > 0:
@@ -257,7 +278,8 @@ def main() -> None:
                 args.split_id,
                 args.flip_time,
                 args.flip_voltage,
-                args.max_time,
+                args.start_time,
+                args.stop_time,
                 args.voltage_scale
             )
     else:

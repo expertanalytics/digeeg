@@ -30,6 +30,15 @@ def save_arrays_numpy(time: np.ndarray, voltage: np.ndarray, out_file: Path) -> 
     np.save(str(out_file), array)
 
 
+def _get_split_number(dataset_path: Path) -> int:
+    split_number_matches = re.findall("eeg_(\d+)_", str(dataset_path))
+
+    if not len(split_number_matches) == 1:
+        raise ValueError(f"could not parse file name {dataset_path}")
+    split_number = int(split_number_matches[0])
+    return split_number
+
+
 def read_dataset(
     dataset_path: Path,
     flip_time: bool=False,
@@ -40,13 +49,7 @@ def read_dataset(
     """
     Voltage scale is measured in micro volts per cm.
     """
-
-    pattern = re.compile("eeg_(\d+)_")
-    split_number_matches = pattern.findall(str(dataset_path))
-
-    if not len(split_number_matches) == 1:
-        raise ValueError(f"could not parse file name {dataset_path}")
-    split_number = int(split_number_matches[0])
+    split_number = _get_split_number(dataset_path)
 
     if dataset_path.suffix == ".h5":
         dts = h5py.File(dataset_path, "r")
@@ -94,8 +97,16 @@ def read_dataset(
 
 
 def join_datasets(
-    dataset_list: tp.List[tp.Tuple[np.ndarray, np.ndarray]]
+    dataset_list: tp.List[tp.Tuple[np.ndarray, np.ndarray]],
+    split_number_list: tp.List[int],
+    max_time: float,
+    overlap: int = 140
 ) -> tp.Tuple[np.ndarray, np.ndarray]:
+    """
+    Concetenate the arrays representing the voltage traces.
+
+    If there are any missing splits, insert `max_time` as a jump in the temporal axis.
+    """
     time_list = []
     voltages_list = []
 
@@ -103,9 +114,14 @@ def join_datasets(
     voltages_list.append(dataset_list[0][1])
     last_time = time_list[-1][-1]
     for i in range(1, len(dataset_list)):
-        # time_list.append(dataset_list[i][0][:-140] + last_time)
-        time_list.append(dataset_list[i][0][:-140])
-        voltages_list.append(dataset_list[i][1][:-140])
+        time_difference = 0
+        split_number_diff = split_number_list[i] - split_number_list[i - 1]
+        if split_number_diff > 1:
+            time_difference = max_time*(split_number_diff - 1)      # TODO: is -1 correct?
+            assert False, time_difference
+
+        time_list.append(dataset_list[i][0][:-overlap] + time_difference)
+        voltages_list.append(dataset_list[i][1][:-overlap])
         last_time = time_list[-1][-1]
 
     time_array = concatenate_arrays(time_list)
@@ -223,6 +239,14 @@ def _get_flag(arguments: tp.Any) -> str:
     return eeg_flag
 
 
+def _strictly_increasing(L):
+    return all(x < y for x, y in zip(L, L[1:]))
+
+
+def _strictly_decreasing(L):
+    return all(x > y for x, y in zip(L, L[1:]))
+
+
 def main():
     parser = create_parser()
     args = parser.parse_args()
@@ -230,6 +254,12 @@ def main():
 
     eeg_flag = _get_flag(args)
     filename_list = parse_filenames(args.eegs, eeg_flag)
+    split_number_list = list(map(_get_split_number, filename_list))
+
+    is_stricty_increasing = _strictly_increasing(split_number_list)
+    is_stricty_decreasing = _strictly_decreasing(split_number_list)
+    msg = "Split number list is neither increasing or decreasing"
+    assert is_stricty_decreasing or is_stricty_increasing, msg
 
     dataset_list = [
         read_dataset(
@@ -240,7 +270,7 @@ def main():
             flip_voltage=args.flip_voltage,
         ) for filename in filename_list
     ]
-    time, voltage = join_datasets(dataset_list)
+    time, voltage = join_datasets(dataset_list, split_number_list, args.max_time)
 
     if args.upper:
         out_path = Path(f"{args.name}_upper")
