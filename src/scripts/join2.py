@@ -76,11 +76,9 @@ def read_dataset(
 
     # Compute time scale
     time_scale = _time.max() / max_time
-    _time *= 1/time_scale
 
     # TODO: Check this -- should I normalise
     _voltage -= _voltage.mean()
-    _voltage *= 1/time_scale
     _voltage *= voltage_scale     # micro volts
 
     # Add multipe of max_time based on filename (split number)
@@ -175,7 +173,7 @@ def create_parser() -> argparse.ArgumentParser:
         help="seconds per 15 cm",
         required=False,
         default=6,
-        type=int
+        type=float
     )
 
     parser.add_argument(

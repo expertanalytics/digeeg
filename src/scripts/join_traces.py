@@ -103,11 +103,18 @@ def handle_input_data(filename_list: tp.Iterable[Path]) -> tp.List[np.ndarray]:
 
 
 def create_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser("Join EEG traces together")
+    parser = argparse.ArgumentParser(
+        """Join EEG traces together. Use max time to scale the duration
+        of the time trace. Typically, 25 mm is equivalent to one second.
+
+        Flip time and flip traces are used to flip the time and voltage axes. For "normal"-looking
+        traces use 'flip-voltage'.
+        """
+    )
     parser.add_argument(
         "--upper",
         nargs="+",
-        help="List of EEG trace ids to exclude. Filenames are 'trace{d:}.npy'",
+        help="List of traces in the 'upper' EEG trace. Filenames are 'trace{d:}.npy'",
         type=int,
         required=False,
         default=None
@@ -116,7 +123,7 @@ def create_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--lower",
         nargs="+",
-        help="List of EEG trace ids to exclude. Filenames are 'trace{d:}.npy'",
+        help="List of traces in the 'lower' EEG trace. Filenames are 'trace{d:}.npy'",
         type=int,
         required=False,
         default=None
@@ -163,7 +170,7 @@ def create_parser() -> argparse.ArgumentParser:
         help="seconds per 15 cm. Defaults to 6 seconds.",
         required=False,
         default=6,
-        type=int
+        type=float
     )
 
     return parser
