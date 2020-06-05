@@ -60,6 +60,7 @@ def scale_arrays(
     flip_voltage: bool,
     start_time: float,
     stop_time: float,
+    duration: float,
     voltage_scale: int = 200
 ) -> np.ndarray:
     """
@@ -71,10 +72,16 @@ def scale_arrays(
     Voltage scale is micro V / cm.,
     """
 
-    time_duration = stop_time - start_time
-    time_scale = data_array[:, 0].max()/time_duration
-    data_array[:, 0] /= time_scale      # time interval is now (0, time_duration)
-    data_array[:, 0] += start_time      # time interval is not (start_time, stop_time)
+    if duration is None:
+        _duration = stop_time - start_time
+    else:
+        _duration = duration
+    time_scale = data_array[:, 0].max()/_duration
+
+    data_array[:, 0] /= time_scale     # time interval is now (0, time_duration)
+
+    if duration is None:
+        data_array[:, 0] += start_time     # time interval is not (start_time, stop_time)
 
     data_array[:, 1] -= data_array[:, 1].mean()
     data_array[:, 1] *= voltage_scale
@@ -171,7 +178,7 @@ def create_parser() -> argparse.ArgumentParser:
 
     parser.add_argument(
         "--start-time",
-        help="seconds per 15 cm. Defaults to 6 seconds.",
+        help="Start time in seconds (follow the time stamp). There is typically 25 mm per second.",
         required=False,
         default=0,
         type=float
@@ -179,9 +186,17 @@ def create_parser() -> argparse.ArgumentParser:
 
     parser.add_argument(
         "--stop-time",
-        help="seconds per 15 cm. Defaults to 6 seconds.",
+        help="Stop time in seconds. (Follow the time stamp). There is typically 25 mm per seconds.",
         required=False,
         default=6,
+        type=float
+    )
+
+    parser.add_argument(
+        "--duration",
+        help="Stop time in seconds. (Follow the time stamp). There is typically 25 mm per seconds.",
+        required=False,
+        default=None,
         type=float
     )
 
@@ -197,6 +212,7 @@ def _join_traces(
     flip_voltage: bool,
     start_time: float,
     stop_time: float,
+    duration: float,
     voltage_scale: float,
 ) -> None:
     # Array of trace filenames to include
@@ -213,6 +229,7 @@ def _join_traces(
         flip_voltage=flip_voltage,
         start_time=start_time,
         stop_time=stop_time,
+        duration=duration,
         voltage_scale=voltage_scale
     )
 
@@ -268,6 +285,7 @@ def main() -> None:
                 args.flip_voltage,
                 args.start_time,
                 args.stop_time,
+                args.duration,
                 args.voltage_scale
             )
         if len(lower) > 0:
@@ -280,6 +298,7 @@ def main() -> None:
                 args.flip_voltage,
                 args.start_time,
                 args.stop_time,
+                args.duration,
                 args.voltage_scale
             )
     else:
