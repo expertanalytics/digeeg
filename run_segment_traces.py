@@ -42,7 +42,7 @@ def segment_trace(
         else:
             command += [str(x_interval[0]), str(x_interval[1])]
 
-    if color_filters:
+    if color_filters:       # BGR
         command += [
             "--blue-color-filter", "90", "10", "10", "255", "90", "90",
             "--red-color-filter", "10", "10", "90", "90", "90", "255"
