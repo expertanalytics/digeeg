@@ -109,7 +109,6 @@ def join_datasets(
         split_number_diff = split_number_list[i] - split_number_list[i - 1]
         if split_number_diff > 1:
             time_difference = max_time*(split_number_diff - 1)
-            assert False, time_difference
 
         # if the start time of the time series is specified
         if dataset_list[i][0][0] > last_time:
