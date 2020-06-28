@@ -219,6 +219,15 @@ def _join_traces(
     filename_list = np.asarray([Path(f"trace{number}.npy") for number in traces])
 
     # Array of time series
+    split_id_path = Path(f"split{split_id}")
+    if Path.cwd() == split_id_path:
+        logger.info("Looking for traces in current directory")
+    else:
+        if not split_id_path.is_dir():
+            raise FileNotFoundError(f"Could not find directory: {split_id_path}")
+        else:
+            logger.info(f"Looking for traces in {split_id_path}")
+            filename_list = [split_id_path / p for p in filename_list]
     list_of_arrays = np.asarray(handle_input_data(filename_list))
 
     # Concatenate the arrays
