@@ -10,6 +10,9 @@ import re
 import numpy as np
 import typing as tp
 
+import warnings
+warnings.filterwarnings("ignore", category=DeprecationWarning)
+
 
 def concatenate_arrays(array_list: tp.Iterable[np.ndarray]) -> np.ndarray:
     return np.concatenate(array_list)
@@ -220,17 +223,17 @@ def create_parser() -> argparse.ArgumentParser:
 def _validate_arguments(arguments: tp.Any) -> None:
     if arguments.upper and arguments.lower:
         raise ValueError("only one of 'upper' or 'lower' can be set")
-    if not arguments.upper and not arguments.lower:
-        raise ValueError("One of 'upper' or 'lower' must be set")
+    # if not arguments.upper and not arguments.lower:
+    #     raise ValueError("One of 'upper' or 'lower' must be set")
 
 
-def _get_flag(arguments: tp.Any) -> str:
+def _get_flag(arguments: tp.Any) -> tp.List[str]:
     eeg_flag: str
     if arguments.upper:
-        eeg_flag = "upper"
+        return ["upper"]
     elif arguments.lower:
-        eeg_flag = "lower"
-    return eeg_flag
+        return ["lower"]
+    return ["upper", "lower"]
 
 
 def _strictly_increasing(L):
@@ -246,33 +249,34 @@ def main():
     args = parser.parse_args()
     _validate_arguments(args)
 
-    eeg_flag = _get_flag(args)
-    filename_list = parse_filenames(args.eegs, eeg_flag)
-    split_number_list = list(map(_get_split_number, filename_list))
+    eeg_flag_list = _get_flag(args)
+    for eeg_flag in eeg_flag_list:
+        filename_list = parse_filenames(args.eegs, eeg_flag)
+        split_number_list = list(map(_get_split_number, filename_list))
 
-    is_stricty_increasing = _strictly_increasing(split_number_list)
-    is_stricty_decreasing = _strictly_decreasing(split_number_list)
-    msg = "Split number list is neither increasing or decreasing"
-    assert is_stricty_decreasing or is_stricty_increasing, msg
+        is_stricty_increasing = _strictly_increasing(split_number_list)
+        is_stricty_decreasing = _strictly_decreasing(split_number_list)
+        msg = "Split number list is neither increasing or decreasing"
+        assert is_stricty_decreasing or is_stricty_increasing, msg
 
-    dataset_list = [
-        read_dataset(
-            filename,
-            voltage_scale=args.voltage_scale,
-            flip_time=args.flip_time,
-            flip_voltage=args.flip_voltage,
-        ) for filename in filename_list
-    ]
-    time, voltage = join_datasets(dataset_list, split_number_list, args.max_time)
+        dataset_list = [
+            read_dataset(
+                filename,
+                voltage_scale=args.voltage_scale,
+                flip_time=args.flip_time,
+                flip_voltage=args.flip_voltage,
+            ) for filename in filename_list
+        ]
+        time, voltage = join_datasets(dataset_list, split_number_list, args.max_time)
 
-    if args.upper:
-        out_path = Path(f"{args.name}_upper")
-    else:       # upper/lower exclusivity checked validate_arguments
-        out_path = Path(f"{args.name}_lower")
-    save_arrays_numpy(time, voltage, out_path)
+        if args.upper:
+            out_path = Path(f"{args.name}_upper")
+        else:       # upper/lower exclusivity checked validate_arguments
+            out_path = Path(f"{args.name}_lower")
+        save_arrays_numpy(time, voltage, out_path)
 
-    plot_entire_time_series(time, voltage, args.name, eeg_flag)
-    plt.show()
+        plot_entire_time_series(time, voltage, args.name, eeg_flag)
+        # plt.show()
 
 
 if __name__ == "__main__":
