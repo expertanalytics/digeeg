@@ -246,6 +246,9 @@ def _join_traces(
     )
 
     # save_arrays(data_array, args.output_directory / f"eeg_{args.split_id}_{args.eeg_name}.h5")
+    if not output_directory.is_dir():
+        output_directory.mkdir(exist_ok=True)
+
     save_array_numpy(data_array, output_directory / f"eeg_{split_id}_{eeg_name}")     # appends .npy
     plot_traces(data_array=data_array,
         out_file=output_directory / f"eeg_{split_id}_{eeg_name}.png"
