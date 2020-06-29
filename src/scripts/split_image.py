@@ -29,6 +29,9 @@ from dgutils import (
 
 logging.basicConfig(level=os.environ.get("LOGLEVEL", "INFO"))
 
+import warnings
+warnings.filterwarnings("ignore")
+
 
 logger = logging.getLogger(__name__)
 

@@ -49,6 +49,9 @@ from dgimage import (
 from dgutils import remove_structured_background
 
 
+import warnings
+warnings.filterwarnings("ignore")
+
 logging.basicConfig(level=os.environ.get("LOGLEVEL", "INFO"))
 logger = logging.getLogger(__name__)
 

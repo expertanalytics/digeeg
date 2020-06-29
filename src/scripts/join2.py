@@ -11,7 +11,7 @@ import numpy as np
 import typing as tp
 
 import warnings
-warnings.filterwarnings("ignore", category=DeprecationWarning)
+warnings.filterwarnings("ignore")
 
 
 def concatenate_arrays(array_list: tp.Iterable[np.ndarray]) -> np.ndarray:
@@ -269,10 +269,11 @@ def main():
         ]
         time, voltage = join_datasets(dataset_list, split_number_list, args.max_time)
 
-        if args.upper:
-            out_path = Path(f"{args.name}_upper")
-        else:       # upper/lower exclusivity checked validate_arguments
-            out_path = Path(f"{args.name}_lower")
+        # if args.upper:
+        #     out_path = Path(f"{args.name}_upper")
+        # else:       # upper/lower exclusivity checked validate_arguments
+        #     out_path = Path(f"{args.name}_lower")
+        out_path = Path(f"{args.name}_{eeg_flag}")
         save_arrays_numpy(time, voltage, out_path)
 
         plot_entire_time_series(time, voltage, args.name, eeg_flag)

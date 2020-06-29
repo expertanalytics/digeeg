@@ -12,6 +12,9 @@ import typing as tp
 
 from pathlib import Path
 
+import warnings
+warnings.filterwarnings("ignore")
+
 
 logging.basicConfig(level=os.environ.get("LOGLEVEL", "INFO"))
 logger = logging.getLogger(__name__)

@@ -6,6 +6,9 @@ import argparse
 import logging
 import os
 
+import warnings
+warnings.filterwarnings("ignore")
+
 
 logging.basicConfig(level=os.environ.get("LOGLEVEL", "INFO"))
 

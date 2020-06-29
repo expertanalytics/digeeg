@@ -13,6 +13,9 @@ from pathlib import Path
 from scipy.signal import welch
 
 
+import warnings
+warnings.filterwarnings("ignore")
+
 logging.basicConfig(level=os.environ.get("LOGLEVEL", "INFO"))
 logger = logging.getLogger(__name__)
 

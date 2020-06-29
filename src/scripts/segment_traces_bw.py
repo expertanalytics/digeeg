@@ -31,6 +31,9 @@ from dgutils import (
     plot,
 )
 
+import warnings
+warnings.filterwarnings("ignore")
+
 
 logging.basicConfig(level=os.environ.get("LOGLEVEL", "INFO"))
 logger = logging.getLogger(__name__)

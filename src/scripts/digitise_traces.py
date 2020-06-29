@@ -9,6 +9,9 @@ import argparse
 from pathlib import Path
 from dgimage import read_image
 
+import warnings
+warnings.filterwarnings("ignore")
+
 
 logging.basicConfig(level=os.environ.get("LOGLEVEL", "INFO"))
 

@@ -7,6 +7,9 @@ import argparse
 import logging
 import os
 
+import warnings
+warnings.filterwarnings("ignore")
+
 from pathlib import Path
 from scipy.signal import welch
 
