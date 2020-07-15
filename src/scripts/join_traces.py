@@ -6,6 +6,7 @@ import h5py
 import argparse
 import logging
 import os
+import re
 
 import warnings
 warnings.filterwarnings("ignore")
@@ -145,9 +146,9 @@ def create_parser() -> argparse.ArgumentParser:
 
     parser.add_argument(
         "--output-directory",
-        help="File path to hdf5 dataset.",
+        help="File path to npy dataset.",
         type=Path,
-        required=True,
+        required=False,
     )
 
     parser.add_argument(
@@ -160,7 +161,7 @@ def create_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--flip-voltage",
         help="Multiply voltage by -1.",
-        action="store_true",
+        action="store_false",
         required=False
     )
 
@@ -246,6 +247,25 @@ def _join_traces(
     )
 
     # save_arrays(data_array, args.output_directory / f"eeg_{args.split_id}_{args.eeg_name}.h5")
+    if output_directory is None:
+        cwd_list = list(Path.cwd().parts)
+        if Path.cwd() == split_id_path:
+            _patient, _round, _session, _ = cwd_list[-4:]
+        else:
+            _patient, _round, _session = cwd_list[-3:]
+
+        number_pattern = re.compile("(\d+)")
+        try:
+            patient_number = int(number_pattern.search(_patient).group(1))
+            round_number = int(number_pattern.search(_round).group(1))
+            session_number = int(number_pattern.search(_session).group(1))
+        except (ValueError, AttributeError):
+            msg = "Could not determine correct output directory, please set --output-directory manually'"
+            logger.error(msg)
+            raise
+
+        output_directory = Path(f"timeseries_E{patient_number}_R{round_number}_S{session_number}")
+
     if not output_directory.is_dir():
         output_directory.mkdir(exist_ok=True)
 

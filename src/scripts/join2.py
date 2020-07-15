@@ -213,7 +213,7 @@ def create_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--flip-voltage",
         help="Invert the voltage",
-        action="store_true",
+        action="store_false",
         required=False
     )
 
