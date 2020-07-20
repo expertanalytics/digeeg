@@ -94,7 +94,7 @@ def join_datasets(
     dataset_list: tp.List[tp.Tuple[np.ndarray, np.ndarray]],
     split_number_list: tp.List[int],
     max_time: float,
-    overlap: int = 140
+    overlap: int = int(4000/30)         # EEG width/marker width
 ) -> tp.Tuple[np.ndarray, np.ndarray]:
     """
     Concetenate the arrays representing the voltage traces.
@@ -109,7 +109,7 @@ def join_datasets(
     last_time = time_list[-1][-1]
     for i in range(1, len(dataset_list)):
         time_difference = 0
-        split_number_diff = split_number_list[i] - split_number_list[i - 1]
+        split_number_diff = abs(split_number_list[i] - split_number_list[i - 1])
         if split_number_diff > 1:
             time_difference = max_time*(split_number_diff - 1)
 

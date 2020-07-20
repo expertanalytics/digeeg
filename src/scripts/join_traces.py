@@ -75,18 +75,21 @@ def scale_arrays(
 
     Voltage scale is micro V / cm.,
     """
-
-    if duration is None:
-        _duration = stop_time - start_time
-    else:
-        _duration = duration
-    time_scale = data_array[:, 0].max()/_duration
+    data_array[:, 0] -= data_array[0, 0]    # -= t0
+    time_scale = data_array[:, 0].max()/duration
 
     data_array[:, 0] /= time_scale     # time interval is now (0, time_duration)
+    data_array[:, 0] += start_time     # time interval is not (start_time, stop_time)
 
-    if duration is None:
-        data_array[:, 0] += start_time     # time interval is not (start_time, stop_time)
+    tolerance = 0.1     # How close the scaling should be to match stop-time
+    if stop_time is not None:
+        if abs(stop_time - data_array[-1, 0]) > tolerance:
+            _data_array = np.zeros(shape=(data_array.shape[0] + 1, data_array.shape[1]))
+            _data_array[:-1, :] = data_array
+            _data_array[-1, ...] = [stop_time, 0]       # Place a zero to demarkate end of split
+            data_array = _data_array
 
+    # Apply voltage scale and mean center
     data_array[:, 1] -= data_array[:, 1].mean()
     data_array[:, 1] *= voltage_scale
 
@@ -94,6 +97,7 @@ def scale_arrays(
         data_array[:, 1] = data_array[:, 1][::-1]
     if flip_voltage:
         data_array[:, 1] *= -1
+    return data_array
 
 
 def read_dataset(filename: Path) -> tp.List[np.ndarray]:
@@ -192,7 +196,7 @@ def create_parser() -> argparse.ArgumentParser:
         "--stop-time",
         help="Stop time in seconds. (Follow the time stamp). There is typically 25 mm per seconds.",
         required=False,
-        default=6,
+        default=0,
         type=float
     )
 
@@ -200,7 +204,7 @@ def create_parser() -> argparse.ArgumentParser:
         "--duration",
         help="Stop time in seconds. (Follow the time stamp). There is typically 25 mm per seconds.",
         required=False,
-        default=None,
+        default=6,
         type=float
     )
 
@@ -236,7 +240,7 @@ def _join_traces(
 
     # Concatenate the arrays
     data_array = concatenate_arrays(list_of_arrays)
-    scale_arrays(
+    data_array = scale_arrays(
         data_array=data_array,
         flip_time=flip_time,
         flip_voltage=flip_voltage,
