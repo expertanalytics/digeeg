@@ -196,7 +196,7 @@ def create_parser() -> argparse.ArgumentParser:
         "--stop-time",
         help="Stop time in seconds. (Follow the time stamp). There is typically 25 mm per seconds.",
         required=False,
-        default=0,
+        default=None,
         type=float
     )
 
