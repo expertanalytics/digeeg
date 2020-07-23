@@ -265,6 +265,7 @@ def _join_traces(
             session_number = int(number_pattern.search(_session).group(1))
         except (ValueError, AttributeError):
             msg = "Could not determine correct output directory, please set --output-directory manually'"
+            msg += f"Expecting directory structure 'Ex/Ry/Sz', got {_patient}{_round}{_session}"
             logger.error(msg)
             raise
 
