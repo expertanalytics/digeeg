@@ -1,4 +1,4 @@
-FROM ubuntu:19.10
+FROM ubuntu:20.10
 
 USER root
 
@@ -8,8 +8,7 @@ RUN mkdir -p /usr/home/shared
 WORKDIR $HOME
 VOLUME $HOME/shared
 
-RUN apt-get update && \
-    apt-get -y upgrade && \
+RUN apt-get update && apt-get -y upgrade && \
     apt-get -y install python3-pip git libsm6 libxrender1 && \
     apt-get -y install vim && \
     python3 -m pip install --upgrade pip && \
